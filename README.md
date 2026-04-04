@@ -57,11 +57,11 @@ Runtime flow:
 
 Main code locations:
 
-- [src/index.js](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/src/index.js)
-- [src/transport/onebot-transport.js](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/src/transport/onebot-transport.js)
-- [src/engine/message-engine.js](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/src/engine/message-engine.js)
-- [src/provider/codex-runner.js](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/src/provider/codex-runner.js)
-- [src/session/file-session-store.js](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/src/session/file-session-store.js)
+- [src/index.js](./src/index.js)
+- [src/transport/onebot-transport.js](./src/transport/onebot-transport.js)
+- [src/engine/message-engine.js](./src/engine/message-engine.js)
+- [src/provider/codex-runner.js](./src/provider/codex-runner.js)
+- [src/session/file-session-store.js](./src/session/file-session-store.js)
 
 ## Requirements
 
@@ -279,7 +279,7 @@ Reduce risk by:
 
 - narrowing `KNOWLEDGE_ROOT`
 - using a safer `KNOWLEDGE_LABEL`
-- reviewing and tightening sanitization rules in [src/engine/message-engine.js](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/src/engine/message-engine.js)
+- reviewing and tightening sanitization rules in [src/engine/message-engine.js](./src/engine/message-engine.js)
 
 ## Files and Directories
 
@@ -293,7 +293,7 @@ Reduce risk by:
 
 ## Related Docs
 
-- [README_CN.md](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/README_CN.md)
-- [docs/ARCHITECTURE.md](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/docs/ARCHITECTURE.md)
-- [docs/NAPCAT_SETUP.md](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/docs/NAPCAT_SETUP.md)
-- [docs/NAPCAT_CHECKLIST.md](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/docs/NAPCAT_CHECKLIST.md)
+- [README_CN.md](./README_CN.md)
+- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
+- [docs/NAPCAT_SETUP.md](./docs/NAPCAT_SETUP.md)
+- [docs/NAPCAT_CHECKLIST.md](./docs/NAPCAT_CHECKLIST.md)

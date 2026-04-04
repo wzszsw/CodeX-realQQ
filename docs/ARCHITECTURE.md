@@ -60,7 +60,7 @@ Responsible for:
 
 Current implementation:
 
-- [src/transport/onebot-transport.js](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/src/transport/onebot-transport.js)
+- [src/transport/onebot-transport.js](../src/transport/onebot-transport.js)
 
 Current transport choice:
 
@@ -89,7 +89,7 @@ Responsible for:
 
 Current implementation:
 
-- [src/engine/message-engine.js](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/src/engine/message-engine.js)
+- [src/engine/message-engine.js](../src/engine/message-engine.js)
 
 Current command set:
 
@@ -108,7 +108,7 @@ Responsible for:
 
 Current implementation:
 
-- [src/provider/codex-runner.js](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/src/provider/codex-runner.js)
+- [src/provider/codex-runner.js](../src/provider/codex-runner.js)
 
 Current provider contract:
 
@@ -125,7 +125,7 @@ Responsible for:
 
 Current implementation:
 
-- [src/session/file-session-store.js](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/src/session/file-session-store.js)
+- [src/session/file-session-store.js](../src/session/file-session-store.js)
 
 ## Message Routing Rules
 

@@ -57,11 +57,11 @@
 
 核心代码位置：
 
-- [src/index.js](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/src/index.js)
-- [src/transport/onebot-transport.js](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/src/transport/onebot-transport.js)
-- [src/engine/message-engine.js](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/src/engine/message-engine.js)
-- [src/provider/codex-runner.js](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/src/provider/codex-runner.js)
-- [src/session/file-session-store.js](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/src/session/file-session-store.js)
+- [src/index.js](./src/index.js)
+- [src/transport/onebot-transport.js](./src/transport/onebot-transport.js)
+- [src/engine/message-engine.js](./src/engine/message-engine.js)
+- [src/provider/codex-runner.js](./src/provider/codex-runner.js)
+- [src/session/file-session-store.js](./src/session/file-session-store.js)
 
 ## 环境要求
 
@@ -278,7 +278,7 @@ onebot self id: 3772046889
 
 - 缩小 `KNOWLEDGE_ROOT` 的范围
 - 使用更安全的 `KNOWLEDGE_LABEL`
-- 在 [src/engine/message-engine.js](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/src/engine/message-engine.js) 中继续加强清洗规则
+- 在 [src/engine/message-engine.js](./src/engine/message-engine.js) 中继续加强清洗规则
 
 ## 常用文件和目录
 
@@ -292,7 +292,7 @@ onebot self id: 3772046889
 
 ## 相关文档
 
-- [README.md](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/README.md)
-- [docs/ARCHITECTURE.md](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/docs/ARCHITECTURE.md)
-- [docs/NAPCAT_SETUP.md](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/docs/NAPCAT_SETUP.md)
-- [docs/NAPCAT_CHECKLIST.md](/D:/develop/SOURCE_CODE/easy-query/CodeX-realQQ/docs/NAPCAT_CHECKLIST.md)
+- [README.md](./README.md)
+- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
+- [docs/NAPCAT_SETUP.md](./docs/NAPCAT_SETUP.md)
+- [docs/NAPCAT_CHECKLIST.md](./docs/NAPCAT_CHECKLIST.md)
