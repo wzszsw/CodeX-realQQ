@@ -74,6 +74,36 @@
 
 ## 快速启动
 
+### Windows 一键引导脚本
+
+现在已经有一个 Windows 引导脚本：
+
+```powershell
+cd D:\develop\SOURCE_CODE\easy-query\CodeX-realQQ
+.\scripts\setup-windows.cmd
+```
+
+它会做这些事情：
+
+- 检查 Node.js
+- 检查 `node_modules` 是否存在
+- 必要时询问是否执行 `npm install`
+- 检查默认 QQ NT 路径
+- 检查默认 NapCatQQ 路径
+- 如果没有 `.env`，就基于 `.env.napcat.example` 自动生成
+- 检查 OneBot WebSocket 配置
+- 可选启动 NapCatQQ
+- 最后打印你还需要手工完成的步骤
+
+它不能完全自动化的部分：
+
+- QQ NT 安装
+- NapCatQQ 安装
+- 扫码登录
+- NapCatQQ WebUI 配置
+
+这些步骤仍然需要人工处理，因为本质上是 GUI 和账号授权流程。
+
 ### 1. 安装依赖
 
 ```powershell

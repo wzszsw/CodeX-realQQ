@@ -74,6 +74,36 @@ Main code locations:
 
 ## Quick Start
 
+### Windows guided setup
+
+There is now a Windows guided setup script:
+
+```powershell
+cd D:\develop\SOURCE_CODE\easy-query\CodeX-realQQ
+.\scripts\setup-windows.cmd
+```
+
+What it does:
+
+- checks Node.js
+- checks whether `node_modules` exists
+- optionally runs `npm install`
+- checks default QQ NT paths
+- checks default NapCatQQ paths
+- creates `.env` from `.env.napcat.example` if needed
+- checks OneBot WebSocket settings
+- optionally launches NapCatQQ
+- prints the remaining manual steps
+
+What it does not fully automate:
+
+- QQ NT installation
+- NapCatQQ installation
+- QR-code login
+- NapCatQQ WebUI configuration
+
+Those parts still require manual confirmation because they are GUI- and account-driven.
+
 ### 1. Install dependencies
 
 ```powershell
