@@ -28,8 +28,7 @@ export async function runCodex(config, session, userText, options = {}) {
     let stdoutBuf = '';
     let stderrBuf = '';
     let threadId = null;
-    const messages = [];
-    const finalAnswerMessages = [];
+    let lastAgentMessage = '';
     const reasonings = [];
     const logs = [];
 
@@ -48,8 +47,7 @@ export async function runCodex(config, session, userText, options = {}) {
             if (ev.item?.type === 'agent_message') {
               const text = extractAgentMessageText(ev.item);
               if (text) {
-                messages.push(text);
-                finalAnswerMessages.push(text);
+                lastAgentMessage = text;
               }
               return;
             }
@@ -103,7 +101,7 @@ export async function runCodex(config, session, userText, options = {}) {
       if (stderrBuf.trim()) handleLine(stderrBuf, 'stderr');
 
       const ok = exitCode === 0;
-      const text = finalAnswerMessages.join('\n\n').trim() || messages.join('\n\n').trim();
+      const text = sanitizeFinalAnswer(lastAgentMessage);
 
       resolve({
         ok,
@@ -129,9 +127,13 @@ function buildPrompt(config, userText, session, imagePaths = []) {
     `Knowledge label: ${config.knowledgeLabel}`,
     'Read code and answer questions based on the local repository.',
     'Do not modify files, create files, or run destructive commands.',
-    'Always produce a direct textual answer for the user.',
+    'Always produce a direct final answer for the user.',
+    'Do not include progress updates, work logs, or narration about what you are checking.',
+    'Do not say things like "I will inspect the code", "I confirmed", or describe your search process.',
+    'Do not expose internal thinking or intermediate findings unless the user explicitly asks for step-by-step analysis.',
     'Do not reveal local filesystem paths, usernames, hostnames, tokens, or environment details.',
     `If you need to refer to the repository, call it "${config.knowledgeLabel}".`,
+    'Keep the answer concise and user-focused.',
     'If the answer is uncertain, say so clearly.',
   ].join('\n');
 
@@ -200,4 +202,41 @@ function resolveCodexCommand(codexBin, args) {
     }
   }
   return { command, args };
+}
+
+function sanitizeFinalAnswer(text) {
+  const value = String(text || '').trim();
+  if (!value) return '';
+
+  const lines = value
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd());
+
+  const filtered = lines.filter((line) => {
+    const normalized = line.trim();
+    if (!normalized) return true;
+    return !isProgressNarration(normalized);
+  });
+
+  return filtered.join('\n').trim();
+}
+
+function isProgressNarration(line) {
+  const value = line.toLowerCase();
+  const patterns = [
+    /^我先/,
+    /^我已经/,
+    /^我已/,
+    /^接下来/,
+    /^现在补/,
+    /^关键实现已经/,
+    /^测试里能看到/,
+    /^i('|’)ll /,
+    /^i will /,
+    /^first,? i /,
+    /^i (have )?confirmed /,
+    /^i('?m| am) checking /,
+    /^next,? i /,
+  ];
+  return patterns.some((pattern) => pattern.test(value));
 }
