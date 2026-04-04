@@ -1,0 +1,39 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(332 236) rotate(46) scale(1040 980)">
+      <stop stop-color="#FCFBFF"/>
+      <stop offset="0.58" stop-color="#F4F2FB"/>
+      <stop offset="1" stop-color="#E9E5F6"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="164" y1="148" x2="864" y2="870" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D9D0F3"/>
+      <stop offset="1" stop-color="#F1C8D8"/>
+    </linearGradient>
+    <filter id="cardShadow" x="86" y="86" width="852" height="852" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="20"/>
+      <feGaussianBlur stdDeviation="26"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.509804 0 0 0 0 0.439216 0 0 0 0 0.694118 0 0 0 0.2 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#cardShadow)">
+    <circle cx="512" cy="492" r="396" fill="url(#bg)"/>
+    <circle cx="512" cy="492" r="384" stroke="url(#ring)" stroke-width="10"/>
+  </g>
+
+  <circle cx="512" cy="492" r="332" fill="#FFFFFF" fill-opacity="0.72"/>
+
+  <g transform="translate(192 152) scale(26.5)">
+    <path d="M12 8V4H8" stroke="#A24A86" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect width="16" height="12" x="4" y="8" rx="2" stroke="#A24A86" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M2 14h2" stroke="#A24A86" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M20 14h2" stroke="#A24A86" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M15 13v2" stroke="#A24A86" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M9 13v2" stroke="#A24A86" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
