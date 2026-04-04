@@ -21,6 +21,11 @@ export class MessageEngine {
       return;
     }
 
+    if (isSensitiveMetaQuestion(text)) {
+      await this.reply(message.conversationId, buildSensitiveMetaRefusal());
+      return;
+    }
+
     if (text === '/help') {
       await this.reply(message.conversationId, [
         '可用命令',
@@ -232,10 +237,46 @@ function buildIdentityReply(knowledgeLabel) {
   return [
     `我是 ${label} 的问答助手。`,
     '',
-    '你可以直接问我这类问题：',
-    '- 某个功能在哪里实现',
-    '- 某个类、方法或配置是做什么的',
-    '- 模块之间是怎么调用的',
-    '- 一段代码或机制该怎么理解',
+    '我可以回答这类问题：',
+    `- ${label} 的功能、定位和概念`,
+    '- API / DSL 的写法和用法',
+    '- 查询、更新、删除、逻辑删除等机制',
+    '- 注解、配置、策略扩展',
+    '- 常见场景的示例写法与行为说明',
+    '',
+    '你可以直接问具体问题。',
+  ].join('\n');
+}
+
+function isSensitiveMetaQuestion(text) {
+  const value = String(text || '').trim().toLowerCase();
+  if (!value) return false;
+
+  const patterns = [
+    /system\s*prompt/,
+    /\bprompt\b.*(输出|泄露|打印|展示|show|print|dump|reveal)/,
+    /(输出|打印|展示|泄露).*(system|prompt|提示词|系统提示|系统指令|隐藏指令|内部指令)/,
+    /(推测|猜测|还原|复原).*(system|prompt|提示词|系统提示|系统指令|隐藏指令|内部指令)/,
+    /(当前|所有|完整|全部).*(消息|message|history|聊天记录|上下文|会话)/,
+    /(输出|打印|展示|泄露).*(所有消息|全部消息|完整消息|历史消息|上下文|会话记录|memory|记忆)/,
+    /(调试|debug).*(消息|history|prompt|提示词|上下文|会话)/,
+    /(developer|system).*(message|messages|prompt|instruction|instructions)/,
+    /(内部配置|隐藏配置|环境变量|token|access[_ -]?token|webui token|secret|密钥)/,
+    /(把.*(历史|上下文|消息|prompt|提示词).*(发出来|贴出来|给我))/,
+  ];
+
+  return patterns.some((pattern) => pattern.test(value));
+}
+
+function buildSensitiveMetaRefusal() {
+  return [
+    '这个请求我不能提供。',
+    '',
+    '我不会输出或复原这些内容：',
+    '- system prompt、提示词或内部指令',
+    '- 会话历史、隐藏消息或调试信息',
+    '- token、密钥、环境变量或内部配置',
+    '',
+    '如果你想了解能力范围，可以直接问业务问题、API 用法或机制说明。',
   ].join('\n');
 }
