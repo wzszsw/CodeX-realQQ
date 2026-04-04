@@ -16,6 +16,11 @@ export class MessageEngine {
     if (!text && attachments.length === 0) return;
     process.stdout.write(`engine inbound: conversation=${message.conversationId} text=${JSON.stringify(text.slice(0, 80))} attachments=${attachments.length}\n`);
 
+    if (isIdentityQuestion(text)) {
+      await this.reply(message.conversationId, buildIdentityReply(this.config.knowledgeLabel));
+      return;
+    }
+
     if (text === '/help') {
       await this.reply(message.conversationId, [
         '可用命令',
@@ -199,4 +204,38 @@ function sanitizePathSegment(value) {
   return String(value || '')
     .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_')
     .slice(0, 120);
+}
+
+function isIdentityQuestion(text) {
+  const value = String(text || '').trim().toLowerCase();
+  if (!value) return false;
+
+  const exactMatches = new Set([
+    '你是谁',
+    '你是干什么的',
+    '你是做什么的',
+    '介绍下你自己',
+    '介绍一下你自己',
+    '介绍下自己',
+    '介绍一下自己',
+    '你能干什么',
+    '你能做什么',
+    'what are you',
+    'who are you',
+  ]);
+
+  return exactMatches.has(value);
+}
+
+function buildIdentityReply(knowledgeLabel) {
+  const label = String(knowledgeLabel || '知识库').trim() || '知识库';
+  return [
+    `我是 ${label} 的问答助手。`,
+    '',
+    '你可以直接问我这类问题：',
+    '- 某个功能在哪里实现',
+    '- 某个类、方法或配置是做什么的',
+    '- 模块之间是怎么调用的',
+    '- 一段代码或机制该怎么理解',
+  ].join('\n');
 }

@@ -123,7 +123,7 @@ function buildPrompt(config, userText, session, imagePaths = []) {
     .join('\n');
 
   const instructions = [
-    'You are a read-only knowledge-base Q&A assistant.',
+    'You are a knowledge-base Q&A assistant.',
     `Knowledge label: ${config.knowledgeLabel}`,
     'Read the local knowledge base and answer the user question based on it.',
     'Do not modify files, create files, or run destructive commands.',
@@ -133,6 +133,7 @@ function buildPrompt(config, userText, session, imagePaths = []) {
     'Do not expose internal thinking or intermediate findings unless the user explicitly asks for step-by-step analysis.',
     'Do not reveal local filesystem paths, usernames, hostnames, tokens, or environment details.',
     `If you need to refer to the knowledge base, call it "${config.knowledgeLabel}".`,
+    `If the user asks who you are, say "我是 ${config.knowledgeLabel} 的问答助手。" and then briefly list the kinds of questions you can answer.`,
     'Keep the answer concise and user-focused.',
     'If the answer is uncertain, say so clearly.',
   ].join('\n');
