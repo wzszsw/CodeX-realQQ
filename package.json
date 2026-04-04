@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Real-QQ oriented Codex bridge scaffold with pluggable transport/runtime/session layers.",
+  "description": "Real-QQ oriented Codex knowledge-base bridge with pluggable transport/runtime/session layers.",
   "engines": {
     "node": ">=20"
   },

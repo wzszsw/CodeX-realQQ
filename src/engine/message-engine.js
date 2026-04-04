@@ -14,6 +14,7 @@ export class MessageEngine {
     const text = String(message.text || '').trim();
     const attachments = Array.isArray(message.attachments) ? message.attachments : [];
     if (!text && attachments.length === 0) return;
+    process.stdout.write(`engine inbound: conversation=${message.conversationId} text=${JSON.stringify(text.slice(0, 80))} attachments=${attachments.length}\n`);
 
     if (text === '/help') {
       await this.reply(message.conversationId, [
@@ -79,7 +80,12 @@ export class MessageEngine {
   async reply(conversationId, text) {
     const chunks = splitReplyText(text, this.config.maxReplyChars);
     for (const chunk of chunks) {
-      await this.transport.sendText(conversationId, chunk);
+      try {
+        await this.transport.sendText(conversationId, chunk);
+      } catch (err) {
+        process.stderr.write(`reply failed: conversation=${conversationId} error=${err instanceof Error ? err.message : String(err)}\n`);
+        throw err;
+      }
     }
   }
 }

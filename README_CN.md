@@ -1,25 +1,25 @@
 # CodeX-realQQ
 
-`CodeX-realQQ` 是一套运行在本机上的真实 QQ 源码问答桥接系统，核心链路是：
+`CodeX-realQQ` 是一套运行在本机上的真实 QQ 知识库问答桥接系统，核心链路是：
 
 - 官方 QQ NT
 - NapCatQQ
 - OneBot 11 WebSocket
 - 本机 Codex CLI
-- 只读源码问答层
+- 只读知识库问答层
 
 它适合做这些事情：
 
-- 在 QQ 私聊或群聊里自动回答源码问题
-- 把一个本地目录当成知识根目录进行问答
+- 在 QQ 私聊或群聊里自动回答知识库问题
+- 把一个本地目录当成知识库根目录进行问答
 - 解释代码实现、模块关系、调用链和配置入口
 - 结合用户发送的图片一起回答问题
 
-当前实现不是绑定单一仓库，而是绑定一个目录。你可以把 `easy-query`、`hibernate` 等多个源码仓库都放在同一个知识目录下。
+当前实现不是绑定单一项目，而是绑定一个目录。你可以把 `easy-query`、`hibernate` 等多个项目都放在同一个知识库目录下。
 
 ## 它是什么
 
-收到 QQ 消息后，系统会把消息转发给本机的 Codex CLI。Codex 在指定的本地源码目录里只读检索和分析，然后把回答通过 NapCatQQ 发回 QQ。
+收到 QQ 消息后，系统会把消息转发给本机的 Codex CLI。Codex 在指定的本地知识库目录里只读检索和分析，然后把回答通过 NapCatQQ 发回 QQ。
 
 当前支持：
 
@@ -41,7 +41,7 @@
 - 它不是云端托管服务
 - 它默认不是可写的自动编码代理
 
-当前推荐用途是只读源码问答。
+当前推荐用途是只读知识库问答。
 
 ## 系统架构
 
@@ -52,7 +52,7 @@
 3. `CodeX-realQQ` 作为客户端连接这个 WebSocket
 4. 收到的消息被标准化成内部消息模型
 5. 文本和图片一起交给本机 Codex CLI
-6. Codex 读取配置的知识目录并生成回答
+6. Codex 读取配置的知识库并生成回答
 7. 回答经过清洗后再通过 NapCatQQ 发回 QQ
 
 核心代码位置：
@@ -62,6 +62,26 @@
 - [src/engine/message-engine.js](./src/engine/message-engine.js)
 - [src/provider/codex-runner.js](./src/provider/codex-runner.js)
 - [src/session/file-session-store.js](./src/session/file-session-store.js)
+
+### 如何指定知识库位置
+
+在 `.env` 里配置：
+
+```env
+KNOWLEDGE_ROOT=D:\develop\SOURCE_CODE\easy-query
+KNOWLEDGE_LABEL=easy-query
+```
+
+含义：
+
+- `KNOWLEDGE_ROOT`：Codex 可读取的本地知识库根目录
+- `KNOWLEDGE_LABEL`：对外展示给用户的知识库名称，用来替代真实本地路径
+
+`KNOWLEDGE_ROOT` 可以指向：
+
+- 单个项目目录
+- 包含多个项目的父目录
+- 混合了代码、文档、笔记、示例的知识库目录
 
 ## 环境要求
 
@@ -147,7 +167,7 @@ QQ_POLL_INTERVAL_MS=1500
 
 说明：
 
-- `KNOWLEDGE_ROOT` 可以是一个父目录，里面放多个源码仓库。
+- `KNOWLEDGE_ROOT` 可以是一个父目录，里面放多个项目。
 - `KNOWLEDGE_LABEL` 是对外展示的知识库名字，用来替代本地真实路径。
 - `CODEX_BIN` 如果环境里直接能跑 `codex`，可以写成 `codex`。
 - 在部分 Windows 环境中，直接写 `node.exe` 会比包装命令更稳定。
@@ -236,11 +256,11 @@ onebot self id: 3772046889
 
 ## 关键配置项
 
-### 知识目录和身份
+### 知识库和身份
 
 - `KNOWLEDGE_ROOT`：Codex 可读取的本地目录
 - `KNOWLEDGE_LABEL`：对外展示的知识库名称
-- `READ_ONLY_QA_MODE`：源码问答建议保持 `true`
+- `READ_ONLY_QA_MODE`：知识库问答建议保持 `true`
 
 ### OneBot
 
@@ -290,7 +310,7 @@ onebot self id: 3772046889
 检查：
 
 - 同一 Windows 用户会话里 Codex CLI 是否能正常使用
-- 当前账号是否仍有权限访问知识目录
+- 当前账号是否仍有权限访问知识库
 - Codex 的登录态是否有效
 
 ### 文本可用，但图片问答失败

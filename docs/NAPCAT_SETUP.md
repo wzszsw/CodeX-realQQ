@@ -90,7 +90,7 @@ QQ_POLL_INTERVAL_MS=1500
 
 Key notes:
 
-- `KNOWLEDGE_ROOT` can be a parent directory containing multiple repositories.
+- `KNOWLEDGE_ROOT` can be a parent directory containing multiple projects.
 - `KNOWLEDGE_LABEL` is what users will see in answers instead of your local filesystem path.
 - `ONEBOT_SELF_ID` can be left empty at first. The bridge will try `get_login_info`.
 - `ATTACHMENT_DIR` is required for image questions.

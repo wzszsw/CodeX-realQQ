@@ -4,14 +4,14 @@ This document describes the current runtime architecture of `CodeX-realQQ`.
 
 ## Goal
 
-The project connects a real QQ account to a local Codex CLI process so users can ask source-code questions in QQ private chats or group chats.
+The project connects a real QQ account to a local Codex CLI process so users can ask knowledge-base questions in QQ private chats or group chats.
 
 The design target is:
 
 - local-only deployment
 - real QQ account instead of official QQ bot platform
 - OneBot-compatible transport boundary
-- read-only repository Q&A
+- read-only knowledge-base Q&A
 - optional image-assisted questions
 
 ## Runtime Flow
@@ -23,7 +23,7 @@ The design target is:
 5. Incoming OneBot events are mapped into an internal message model.
 6. The message engine handles commands, session history, image materialization, and prompt preparation.
 7. The provider starts a local Codex CLI process.
-8. Codex reads from the configured knowledge directory and returns a final answer.
+8. Codex reads from the configured knowledge base and returns a final answer.
 9. The answer is sanitized and sent back to QQ through NapCatQQ.
 
 ## Normalized Message Model
@@ -163,17 +163,17 @@ Current mitigation layers:
 
 - prompt-level instruction not to reveal local paths, usernames, hostnames, tokens, or environment details
 - output sanitization for obvious absolute paths
-- replacement of real repository paths with `KNOWLEDGE_LABEL`
+- replacement of real knowledge-base paths with `KNOWLEDGE_LABEL`
 
 This reduces accidental leakage but does not provide a formal guarantee.
 
 ## Why the Project Is Directory-Oriented
 
-The bridge points at `KNOWLEDGE_ROOT`, not a single repository.
+The bridge points at `KNOWLEDGE_ROOT`, not a single project.
 
 This is intentional because common use cases include:
 
-- answering across multiple related repositories
+- answering across multiple related projects
 - comparing two projects in one conversation
 - dropping several source trees under one parent directory
 

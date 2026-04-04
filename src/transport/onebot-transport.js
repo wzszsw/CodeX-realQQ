@@ -30,6 +30,8 @@ export class OneBotTransport {
       throw new Error('onebot websocket not connected');
     }
 
+    process.stdout.write(`onebot outbound: conversation=${payload.conversationId} chars=${payload.text.length}\n`);
+
     if (this.config.onebot.replyMode === 'send_msg') {
       await this.callApi('send_msg', {
         message_type: target.chatType === 'group' ? 'group' : 'private',
@@ -106,6 +108,7 @@ export class OneBotTransport {
 
     const message = mapOneBotMessage(payload, this.config, this.selfId, this);
     if (!message) return;
+    process.stdout.write(`onebot inbound: type=${message.chatType} conversation=${message.conversationId} sender=${message.senderId} text=${JSON.stringify(String(message.text || '').slice(0, 80))}\n`);
     if (!this.handlers.inbound) return;
     await this.handlers.inbound(message);
   }

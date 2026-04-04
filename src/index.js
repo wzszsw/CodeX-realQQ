@@ -25,6 +25,7 @@ transport.onInbound(async (message) => {
 console.log(`CodeX-realQQ starting`);
 console.log(`mode: ${config.appMode}`);
 console.log(`knowledge label: ${config.knowledgeLabel}`);
+console.log(`knowledge root: ${config.knowledgeRoot}`);
 console.log(`read-only qa: ${config.readOnlyQaMode}`);
 
 await transport.start();

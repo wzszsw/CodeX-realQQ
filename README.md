@@ -1,25 +1,25 @@
 # CodeX-realQQ
 
-`CodeX-realQQ` is a local real-QQ source-code Q&A bridge built on top of:
+`CodeX-realQQ` is a local real-QQ knowledge-base Q&A bridge built on top of:
 
 - official QQ NT
 - NapCatQQ
 - OneBot 11 WebSocket
 - local Codex CLI
-- a read-only repository Q&A layer
+- a read-only knowledge-base Q&A layer
 
 It is intended for scenarios such as:
 
 - answering questions in private chat or group chat
-- reading one or more local source trees as the knowledge base
-- explaining code, module structure, call chains, and implementation details
+- reading one or more local directories as the knowledge base
+- explaining implementation details, module structure, call chains, and configuration behavior
 - analyzing images that users send together with a question
 
-The current implementation is generic. It does not need to be bound to a single repository. You can point it at a directory that contains multiple projects, such as both `easy-query` and `hibernate`.
+The current implementation is generic. It does not need to be bound to a single project. You can point it at a directory that contains multiple projects, such as both `easy-query` and `hibernate`.
 
 ## What It Does
 
-Incoming QQ messages are forwarded to a local Codex CLI process, which reads code from a configured local directory and returns a textual answer. Replies are sent back to QQ through NapCatQQ.
+Incoming QQ messages are forwarded to a local Codex CLI process, which reads from a configured local knowledge-base directory and returns a textual answer. Replies are sent back to QQ through NapCatQQ.
 
 Supported message patterns:
 
@@ -41,7 +41,7 @@ Built-in commands:
 - It is not a hosted service.
 - It is not a write-enabled coding agent by default.
 
-The intended mode is read-only repository Q&A.
+The intended mode is read-only knowledge-base Q&A.
 
 ## Architecture
 
@@ -52,7 +52,7 @@ Runtime flow:
 3. `CodeX-realQQ` connects to that WebSocket server as a client.
 4. Incoming messages are normalized into the bridge's internal message model.
 5. Text and image attachments are passed to a local Codex CLI process.
-6. Codex reads the configured knowledge directory and generates an answer.
+6. Codex reads the configured knowledge base and generates an answer.
 7. The answer is sanitized and sent back through NapCatQQ.
 
 Main code locations:
@@ -62,6 +62,26 @@ Main code locations:
 - [src/engine/message-engine.js](./src/engine/message-engine.js)
 - [src/provider/codex-runner.js](./src/provider/codex-runner.js)
 - [src/session/file-session-store.js](./src/session/file-session-store.js)
+
+### How to set the knowledge-base path
+
+Set it in `.env`:
+
+```env
+KNOWLEDGE_ROOT=D:\develop\SOURCE_CODE\easy-query
+KNOWLEDGE_LABEL=easy-query
+```
+
+Meaning:
+
+- `KNOWLEDGE_ROOT`: the local directory that Codex can read as the knowledge base
+- `KNOWLEDGE_LABEL`: the external name shown to users instead of the real local path
+
+You can point `KNOWLEDGE_ROOT` to:
+
+- a single project directory
+- a parent directory that contains multiple projects
+- a mixed knowledge base containing code, docs, notes, and examples
 
 ## Requirements
 
@@ -147,7 +167,7 @@ QQ_POLL_INTERVAL_MS=1500
 
 Notes:
 
-- `KNOWLEDGE_ROOT` can be a parent directory containing multiple repositories.
+- `KNOWLEDGE_ROOT` can be a parent directory containing multiple projects.
 - `KNOWLEDGE_LABEL` is the public-facing name used in replies instead of the local path.
 - `CODEX_BIN` may be `codex` if your environment resolves it correctly.
 - On some Windows setups, using `node.exe` directly is more reliable than using a wrapper command.
@@ -226,7 +246,7 @@ The bridge is configured to reduce accidental local leakage:
 
 - prompts tell Codex not to reveal local filesystem paths, usernames, hostnames, tokens, or environment details
 - outgoing replies are sanitized to mask obvious absolute paths
-- repository references are rewritten to `KNOWLEDGE_LABEL`
+- knowledge-base references are rewritten to `KNOWLEDGE_LABEL`
 
 Practical caveats:
 
@@ -241,7 +261,7 @@ Practical caveats:
 
 - `KNOWLEDGE_ROOT`: local directory that Codex is allowed to read
 - `KNOWLEDGE_LABEL`: public label exposed in answers
-- `READ_ONLY_QA_MODE`: keep this as `true` for repository Q&A
+- `READ_ONLY_QA_MODE`: keep this as `true` for knowledge-base Q&A
 
 ### OneBot
 
@@ -291,7 +311,7 @@ Fix:
 Check:
 
 - Codex CLI works in the same Windows user session
-- the current account still has access to the knowledge directory
+- the current account still has access to the knowledge base
 - your Codex authentication is valid
 
 ### Text works, but image questions fail
