@@ -26,6 +26,11 @@ export class MessageEngine {
       return;
     }
 
+    if (isOutOfScopeQuestion(text)) {
+      await this.reply(message.conversationId, buildOutOfScopeRefusal(this.config.knowledgeLabel));
+      return;
+    }
+
     if (text === '/help') {
       await this.reply(message.conversationId, [
         '可用命令',
@@ -81,7 +86,12 @@ export class MessageEngine {
     const rawAnswer = this.config.showReasoning && result.reasonings.length
       ? ['[Reasoning]', result.reasonings.join('\n\n'), '', '[Answer]', result.text].join('\n')
       : result.text || '已完成，但没有返回文本。';
-    const answer = sanitizeReplyText(rawAnswer, this.config);
+    const answer = sanitizeReplyText(rawAnswer, this.config, text);
+
+    if (!answer) {
+      await this.reply(message.conversationId, buildBlockedReply());
+      return;
+    }
 
     this.sessionStore.appendMessage(message.conversationId, 'assistant', answer);
     await this.reply(message.conversationId, answer);
@@ -100,7 +110,7 @@ export class MessageEngine {
   }
 }
 
-function sanitizeReplyText(text, config) {
+function sanitizeReplyText(text, config, userText = '') {
   let output = String(text || '');
   const knowledgeRoot = String(config.knowledgeRoot || '').trim();
   const knowledgeLabel = String(config.knowledgeLabel || 'knowledge-base').trim() || 'knowledge-base';
@@ -114,7 +124,11 @@ function sanitizeReplyText(text, config) {
 
   output = output.replace(/[A-Za-z]:\\[^\s"'`]+/g, knowledgeLabel);
   output = output.replace(/\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+){2,}/g, knowledgeLabel);
-  return output.trim();
+  output = output.trim();
+
+  if (!output) return '';
+  if (containsBlockedReplySignals(output, userText)) return '';
+  return output;
 }
 
 function escapeRegex(value) {
@@ -281,4 +295,167 @@ function buildSensitiveMetaRefusal() {
     '',
     '如果你想了解能力范围，可以直接问业务问题、API 用法或机制说明。',
   ].join('\n');
+}
+
+function isOutOfScopeQuestion(text) {
+  const value = normalizeForPolicy(text);
+  if (!value) return false;
+
+  if (looksLikeKnowledgeQuestion(value)) return false;
+
+  const outOfScopeHints = [
+    '新闻',
+    '热点',
+    '时事',
+    '国际',
+    '国内',
+    '选举',
+    '局势',
+    '人物评价',
+    '政策解读',
+    '社会事件',
+    '站队',
+    '观点表态',
+    '宣传文案',
+    '公开信',
+    '倡议书',
+    '演讲稿',
+  ];
+
+  return outOfScopeHints.some((item) => value.includes(item));
+}
+
+function buildOutOfScopeRefusal(knowledgeLabel) {
+  const label = String(knowledgeLabel || '知识库').trim() || '知识库';
+  return [
+    '这个问题不在当前助手的回答范围内。',
+    '',
+    `我只回答和 ${label} 相关的知识库问题，例如代码实现、文档说明、配置行为、插件机制和示例用法。`,
+    '你可以换成具体的代码或文档问题继续问。',
+  ].join('\n');
+}
+
+function buildBlockedReply() {
+  return [
+    '这条回复已被安全策略拦截。',
+    '',
+    '请改问和当前知识库直接相关的代码、文档、配置或插件问题。',
+  ].join('\n');
+}
+
+function containsBlockedReplySignals(answer, userText) {
+  const value = normalizeForPolicy(answer);
+  const question = normalizeForPolicy(userText);
+
+  if (!value) return false;
+  if (looksLikePromptLeak(value)) return true;
+
+  const outOfScopeReplyHints = [
+    '新闻',
+    '热点',
+    '时事',
+    '国际',
+    '国内',
+    '选举',
+    '局势',
+    '政策',
+    '倡议',
+    '公开信',
+    '演讲稿',
+    '表态',
+    '立场',
+    '口号',
+  ];
+
+  if (outOfScopeReplyHints.some((item) => value.includes(item))) {
+    if (!looksLikeKnowledgeQuestion(question)) return true;
+    if (!looksLikeKnowledgeAnswer(value)) return true;
+  }
+
+  return false;
+}
+
+function looksLikePromptLeak(text) {
+  const patterns = [
+    'system prompt',
+    'developer message',
+    'hidden instruction',
+    'internal config',
+    'session history',
+    'debug log',
+    'tool output',
+  ];
+  return patterns.some((item) => text.includes(item));
+}
+
+function looksLikeKnowledgeQuestion(text) {
+  const hints = [
+    'easy-query',
+    'hibernate',
+    'plugin',
+    'intellij',
+    'idea',
+    '源码',
+    '代码',
+    '接口',
+    '方法',
+    '类',
+    '注解',
+    '配置',
+    'dsl',
+    'sql',
+    '查询',
+    '更新',
+    '删除',
+    '逻辑删除',
+    '插件',
+    '文档',
+    '实现',
+    '行为',
+    '调用链',
+    '架构',
+    '报错',
+    '异常',
+    '图片',
+    '截图',
+  ];
+  return hints.some((item) => text.includes(item));
+}
+
+function looksLikeKnowledgeAnswer(text) {
+  const hints = [
+    'class',
+    'method',
+    'config',
+    'plugin',
+    'intellij',
+    'easy-query',
+    'hibernate',
+    'sql',
+    'dsl',
+    'api',
+    'annotation',
+    '源码',
+    '代码',
+    '文档',
+    '实现',
+    '配置',
+    '方法',
+    '类',
+    '接口',
+    '注解',
+    '查询',
+    '更新',
+    '删除',
+    '逻辑删除',
+    '插件',
+  ];
+  return hints.some((item) => text.includes(item));
+}
+
+function normalizeForPolicy(text) {
+  return String(text || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
 }
