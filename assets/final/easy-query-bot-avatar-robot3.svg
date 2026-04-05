@@ -28,7 +28,7 @@
 
   <circle cx="512" cy="492" r="332" fill="#FFFFFF" fill-opacity="0.72"/>
 
-  <g transform="translate(192 152) scale(26.5)">
+  <g transform="translate(194 174) scale(26.5)">
     <path d="M12 8V4H8" stroke="#A24A86" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
     <rect width="16" height="12" x="4" y="8" rx="2" stroke="#A24A86" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M2 14h2" stroke="#A24A86" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
