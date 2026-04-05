@@ -70,12 +70,14 @@ Set it in `.env`:
 ```env
 KNOWLEDGE_ROOT=D:\develop\SOURCE_CODE\easy-query
 KNOWLEDGE_LABEL=easy-query
+KNOWLEDGE_PROJECTS=easy-query,easy-query-plugin,intellij-community
 ```
 
 Meaning:
 
 - `KNOWLEDGE_ROOT`: the local directory that Codex can read as the knowledge base
 - `KNOWLEDGE_LABEL`: the external name shown to users instead of the real local path
+- `KNOWLEDGE_PROJECTS`: the main project names inside the knowledge base, used to guide answer scope and priority
 
 You can point `KNOWLEDGE_ROOT` to:
 
@@ -146,6 +148,7 @@ CODEX_BIN=C:\Users\l1622\.version-fox\cache\nodejs\current\node.exe
 
 KNOWLEDGE_ROOT=D:\develop\SOURCE_CODE\easy-query
 KNOWLEDGE_LABEL=easy-query
+KNOWLEDGE_PROJECTS=easy-query,easy-query-plugin,intellij-community
 READ_ONLY_QA_MODE=true
 SESSION_STORE_FILE=./data/sessions.json
 ATTACHMENT_DIR=./data/attachments
@@ -169,6 +172,8 @@ Notes:
 
 - `KNOWLEDGE_ROOT` can be a parent directory containing multiple projects.
 - `KNOWLEDGE_LABEL` is the public-facing name used in replies instead of the local path.
+- `KNOWLEDGE_PROJECTS` is a comma-separated list of the main projects inside the knowledge base, useful for setups like `easy-query`, `easy-query-plugin`, and `intellij-community`.
+- When the question is about core `easy-query` behavior, the bridge will prioritize the main project and only pull in plugin or IntelliJ Platform sources when the question is clearly about IDEA integration or platform internals.
 - `CODEX_BIN` may be `codex` if your environment resolves it correctly.
 - On some Windows setups, using `node.exe` directly is more reliable than using a wrapper command.
 - `ONEBOT_SELF_ID` may be left empty. The bridge will try to detect it through `get_login_info`.
@@ -198,6 +203,7 @@ Expected startup logs:
 CodeX-realQQ starting
 mode: onebot
 knowledge label: easy-query
+knowledge projects: easy-query, easy-query-plugin, intellij-community
 read-only qa: true
 onebot connected: ws://127.0.0.1:3001
 onebot self id: 3772046889
@@ -261,6 +267,7 @@ Practical caveats:
 
 - `KNOWLEDGE_ROOT`: local directory that Codex is allowed to read
 - `KNOWLEDGE_LABEL`: public label exposed in answers
+- `KNOWLEDGE_PROJECTS`: comma-separated list of the main projects inside the knowledge base
 - `READ_ONLY_QA_MODE`: keep this as `true` for knowledge-base Q&A
 
 ### OneBot

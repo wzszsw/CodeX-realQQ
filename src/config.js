@@ -5,6 +5,7 @@ const ROOT = process.cwd();
 
 export function loadConfig() {
   const sessionStoreFile = resolveLocalPath(process.env.SESSION_STORE_FILE || './data/sessions.json');
+  const knowledgeProjects = parseCsv(process.env.KNOWLEDGE_PROJECTS || '');
 
   return {
     rootDir: ROOT,
@@ -12,6 +13,7 @@ export function loadConfig() {
     codexBin: String(process.env.CODEX_BIN || 'codex').trim() || 'codex',
     knowledgeRoot: resolveLocalPath(process.env.KNOWLEDGE_ROOT || '.'),
     knowledgeLabel: String(process.env.KNOWLEDGE_LABEL || 'knowledge-base').trim() || 'knowledge-base',
+    knowledgeProjects,
     readOnlyQaMode: String(process.env.READ_ONLY_QA_MODE || 'true').toLowerCase() !== 'false',
     sessionStoreFile,
     attachmentDir: resolveLocalPath(process.env.ATTACHMENT_DIR || './data/attachments'),

@@ -43,6 +43,7 @@ APP_MODE=onebot
 CODEX_BIN=...
 KNOWLEDGE_ROOT=D:\develop\SOURCE_CODE\easy-query
 KNOWLEDGE_LABEL=easy-query
+KNOWLEDGE_PROJECTS=easy-query,easy-query-plugin,intellij-community
 READ_ONLY_QA_MODE=true
 ATTACHMENT_DIR=./data/attachments
 MAX_IMAGE_ATTACHMENTS=3
@@ -56,6 +57,7 @@ Checklist:
 
 - `KNOWLEDGE_ROOT` points to the directory you want Codex to read
 - `KNOWLEDGE_LABEL` does not expose sensitive local naming
+- `KNOWLEDGE_PROJECTS` matches the main projects that live under that knowledge root
 - `CODEX_BIN` is valid in the bridge process environment
 - `ATTACHMENT_DIR` is writable
 - `QQ_TARGET_GROUPS` is empty or intentionally configured

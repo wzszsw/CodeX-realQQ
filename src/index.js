@@ -26,6 +26,9 @@ console.log(`CodeX-realQQ starting`);
 console.log(`mode: ${config.appMode}`);
 console.log(`knowledge label: ${config.knowledgeLabel}`);
 console.log(`knowledge root: ${config.knowledgeRoot}`);
+if (config.knowledgeProjects.length) {
+  console.log(`knowledge projects: ${config.knowledgeProjects.join(', ')}`);
+}
 console.log(`read-only qa: ${config.readOnlyQaMode}`);
 
 await transport.start();

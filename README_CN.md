@@ -70,12 +70,14 @@
 ```env
 KNOWLEDGE_ROOT=D:\develop\SOURCE_CODE\easy-query
 KNOWLEDGE_LABEL=easy-query
+KNOWLEDGE_PROJECTS=easy-query,easy-query-plugin,intellij-community
 ```
 
 含义：
 
 - `KNOWLEDGE_ROOT`：Codex 可读取的本地知识库根目录
 - `KNOWLEDGE_LABEL`：对外展示给用户的知识库名称，用来替代真实本地路径
+- `KNOWLEDGE_PROJECTS`：知识库内的重点项目列表，用于提示回答范围和优先级
 
 `KNOWLEDGE_ROOT` 可以指向：
 
@@ -146,6 +148,7 @@ CODEX_BIN=C:\Users\l1622\.version-fox\cache\nodejs\current\node.exe
 
 KNOWLEDGE_ROOT=D:\develop\SOURCE_CODE\easy-query
 KNOWLEDGE_LABEL=easy-query
+KNOWLEDGE_PROJECTS=easy-query,easy-query-plugin,intellij-community
 READ_ONLY_QA_MODE=true
 SESSION_STORE_FILE=./data/sessions.json
 ATTACHMENT_DIR=./data/attachments
@@ -169,6 +172,8 @@ QQ_POLL_INTERVAL_MS=1500
 
 - `KNOWLEDGE_ROOT` 可以是一个父目录，里面放多个项目。
 - `KNOWLEDGE_LABEL` 是对外展示的知识库名字，用来替代本地真实路径。
+- `KNOWLEDGE_PROJECTS` 用逗号列出知识库中的重点项目，适合 `easy-query`、`easy-query-plugin`、`intellij-community` 这类多项目场景。
+- 当问题是 `easy-query` 本体功能时，系统会优先基于主项目回答；只有明显涉及 IDEA 插件或 IntelliJ 平台时，才补充读取插件和平台源码。
 - `CODEX_BIN` 如果环境里直接能跑 `codex`，可以写成 `codex`。
 - 在部分 Windows 环境中，直接写 `node.exe` 会比包装命令更稳定。
 - `ONEBOT_SELF_ID` 可以先留空，桥接会自动通过 `get_login_info` 获取。
@@ -197,6 +202,7 @@ node src/index.js
 CodeX-realQQ starting
 mode: onebot
 knowledge label: easy-query
+knowledge projects: easy-query, easy-query-plugin, intellij-community
 read-only qa: true
 onebot connected: ws://127.0.0.1:3001
 onebot self id: 3772046889
@@ -260,6 +266,7 @@ onebot self id: 3772046889
 
 - `KNOWLEDGE_ROOT`：Codex 可读取的本地目录
 - `KNOWLEDGE_LABEL`：对外展示的知识库名称
+- `KNOWLEDGE_PROJECTS`：知识库中的重点项目列表，用逗号分隔
 - `READ_ONLY_QA_MODE`：知识库问答建议保持 `true`
 
 ### OneBot
