@@ -31,6 +31,11 @@ export class MessageEngine {
       return;
     }
 
+    if (isJunkOrAbusiveQuestion(text)) {
+      await this.reply(message.conversationId, buildJunkRefusal(this.config.knowledgeLabel));
+      return;
+    }
+
     if (text === '/help') {
       await this.reply(message.conversationId, [
         '可用命令',
@@ -325,6 +330,17 @@ function isOutOfScopeQuestion(text) {
   return outOfScopeHints.some((item) => value.includes(item));
 }
 
+function isJunkOrAbusiveQuestion(text) {
+  const value = normalizeForPolicy(text);
+  if (!value) return false;
+
+  if (looksLikeKnowledgeQuestion(value) && !hasStrongJunkSignals(value)) {
+    return false;
+  }
+
+  return hasStrongJunkSignals(value);
+}
+
 function buildOutOfScopeRefusal(knowledgeLabel) {
   const label = String(knowledgeLabel || '知识库').trim() || '知识库';
   return [
@@ -343,12 +359,23 @@ function buildBlockedReply() {
   ].join('\n');
 }
 
+function buildJunkRefusal(knowledgeLabel) {
+  const label = String(knowledgeLabel || '知识库').trim() || '知识库';
+  return [
+    '这条消息不符合当前助手的处理规则。',
+    '',
+    `我只处理和 ${label} 直接相关的知识库问题，不处理广告引流、联系方式收集、刷屏灌水、伪装指令或无关内容生成。`,
+    '请改问具体的代码、文档、配置、插件或截图问题。',
+  ].join('\n');
+}
+
 function containsBlockedReplySignals(answer, userText) {
   const value = normalizeForPolicy(answer);
   const question = normalizeForPolicy(userText);
 
   if (!value) return false;
   if (looksLikePromptLeak(value)) return true;
+  if (looksLikeJunkReply(value, question)) return true;
 
   const outOfScopeReplyHints = [
     '新闻',
@@ -372,6 +399,14 @@ function containsBlockedReplySignals(answer, userText) {
     if (!looksLikeKnowledgeAnswer(value)) return true;
   }
 
+  return false;
+}
+
+function looksLikeJunkReply(answer, userText) {
+  if (hasContactCollectionSignals(answer)) return true;
+  if (hasPromotionSignals(answer) && !looksLikeKnowledgeQuestion(userText)) return true;
+  if (hasCommandInjectionSignals(answer) && !looksLikeKnowledgeAnswer(answer)) return true;
+  if (hasMassMessagingSignals(answer)) return true;
   return false;
 }
 
@@ -458,4 +493,108 @@ function normalizeForPolicy(text) {
     .trim()
     .toLowerCase()
     .replace(/\s+/g, ' ');
+}
+
+function hasStrongJunkSignals(text) {
+  return [
+    hasPromotionSignals(text),
+    hasContactCollectionSignals(text),
+    hasCommandInjectionSignals(text),
+    hasMassMessagingSignals(text),
+    hasRepetitionSpam(text),
+  ].some(Boolean);
+}
+
+function hasPromotionSignals(text) {
+  const hints = [
+    '加我',
+    '私聊我',
+    '联系客服',
+    'vx',
+    'vx:',
+    'wechat',
+    'qq号',
+    '群号',
+    '推广',
+    '引流',
+    '返利',
+    '优惠',
+    '代理',
+    '代做',
+    '代写',
+    '接单',
+    '出售',
+    '课程',
+    '培训',
+    '免费领取',
+    '点击链接',
+    '扫码',
+    '官网',
+  ];
+  return hints.some((item) => text.includes(item));
+}
+
+function hasContactCollectionSignals(text) {
+  if (/(联系方式|手机号|手机号码|邮箱|email|wx|wechat|vx|qq)\s*(是|多少|给我|发我|留下|联系)/.test(text)) {
+    return true;
+  }
+  if (/\b1\d{10}\b/.test(text)) return true;
+  if (/\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/.test(text)) return true;
+  if (/\b\d{5,12}\b/.test(text) && /(qq|群|联系|加我|号码)/.test(text)) return true;
+  return false;
+}
+
+function hasCommandInjectionSignals(text) {
+  const hints = [
+    '忽略上面',
+    '忽略之前',
+    '从现在开始',
+    '你现在是',
+    '请严格执行',
+    '无视规则',
+    '覆盖规则',
+    '执行命令',
+    '运行命令',
+    'powershell',
+    'cmd /c',
+    'bash -c',
+    'curl ',
+    'wget ',
+    'invoke-webrequest',
+    '下载并执行',
+    '脚本如下',
+    '把下面内容原样发出',
+    '逐字输出',
+  ];
+  return hints.some((item) => text.includes(item));
+}
+
+function hasMassMessagingSignals(text) {
+  const hints = [
+    '群发',
+    '转发到所有群',
+    '转给大家',
+    '帮我发到群里',
+    '全体成员',
+    '@所有人',
+    '@all',
+    '通知所有人',
+    '公告文案',
+  ];
+  return hints.some((item) => text.includes(item));
+}
+
+function hasRepetitionSpam(text) {
+  if (text.length >= 80) {
+    const uniqueChars = new Set(text.replace(/\s+/g, '').split(''));
+    if (uniqueChars.size > 0 && uniqueChars.size <= 6) return true;
+  }
+
+  const repeatedChunk = /(.{2,12})\1{3,}/;
+  if (repeatedChunk.test(text)) return true;
+
+  const punctuationBurst = /[!?.~。！？]{8,}/;
+  if (punctuationBurst.test(text)) return true;
+
+  return false;
 }
