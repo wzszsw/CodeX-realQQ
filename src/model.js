@@ -333,7 +333,7 @@ function splitCodeBlock(text, limits) {
   }
 
   if (current) chunks.push(current.trim());
-  return chunks.flatMap((item) => item.length > limits.hardLimit ? hardSplitSegment(item, limits.hardLimit) : [item]);
+  return chunks.flatMap((item) => item.length > limits.codeSoftLimit ? hardSplitSegment(item, limits.codeSoftLimit) : [item]);
 }
 
 function buildListSegments(text, limit) {
