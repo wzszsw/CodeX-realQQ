@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { QQ_SPLIT_MARKER } from '../model.js';
 
 export async function runCodex(config, session, userText, options = {}) {
   const imagePaths = Array.isArray(options.imagePaths) ? options.imagePaths : [];
@@ -134,6 +135,21 @@ function buildPrompt(config, userText, session, imagePaths = []) {
     'Do not include progress updates, work logs, or narration about what you are checking.',
     'Do not say things like "I will inspect the code", "I confirmed", or describe your search process.',
     'Do not expose internal thinking or intermediate findings unless the user explicitly asks for step-by-step analysis.',
+    'Write for a QQ chat, not for Markdown readers.',
+    'Use plain text only. Do not use Markdown headings, tables, code fences, bold markers, or long bullet-heavy layouts.',
+    'Prefer short direct sentences. Use simple punctuation and a few short paragraphs or numbered points when needed.',
+    'Structure the answer as 1 or more typed QQ blocks.',
+    'Start each block with exactly one marker on its own line: [[QQ_BLOCK:body]] or [[QQ_BLOCK:code]] or [[QQ_BLOCK:list]] or [[QQ_BLOCK:followup]].',
+    'Use body for normal explanation, code for one coherent code or SQL snippet, list for a compact option list or numbered list, and followup for optional next-step suggestions.',
+    'Use as few blocks as needed. Keep closely related content in the same block.',
+    'Do not split a numbered title from its explanation into different blocks.',
+    'Do not split a short suggestion list into many tiny blocks.',
+    'If you show code, keep one coherent code snippet in one code block whenever possible. Do not split a class, method, field list, or SQL snippet across multiple blocks unless it is truly too long.',
+    `If you cannot follow the typed block format, use ${QQ_SPLIT_MARKER} on its own line only between major semantic blocks.`,
+    `Never explain, quote, or mention these internal markers to the user.`,
+    'If the answer is long, organize it into short self-contained semantic blocks that can be split into multiple QQ messages cleanly.',
+    'Keep each semantic block short. Avoid phone-screen-sized paragraphs.',
+    'For comparison questions, answer directly by dimensions, differences, tradeoffs, and suitable scenarios. Avoid long preambles.',
     'Only answer questions that are genuinely about the local knowledge base, its code, docs, configuration, behavior, usage, architecture, or attached images relevant to that scope.',
     'If the request is unrelated to the local knowledge base, or drifts into public affairs, persuasion, campaigning, or other non-product topics, refuse briefly and redirect to a normal knowledge-base question.',
     'Do not reveal local filesystem paths, usernames, hostnames, tokens, or environment details.',
@@ -144,7 +160,7 @@ function buildPrompt(config, userText, session, imagePaths = []) {
     projectScope ? 'If multiple projects are relevant, combine them into one concise answer instead of listing your search process.' : '',
     `If you need to refer to the knowledge base, call it "${config.knowledgeLabel}".`,
     `If the user asks who you are, say "我是 ${config.knowledgeLabel} 的问答助手。" and then briefly list the kinds of questions you can answer, such as concepts, API usage, query/update/delete behavior, annotations, configuration, and strategy extensions.`,
-    'Keep the answer concise and user-focused.',
+    'Keep the answer concise and user-focused. Default to a short answer unless the user clearly asks for depth.',
     'If the answer is uncertain, say so clearly.',
   ].join('\n');
 

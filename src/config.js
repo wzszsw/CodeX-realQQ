@@ -18,6 +18,8 @@ export function loadConfig() {
     sessionStoreFile,
     attachmentDir: resolveLocalPath(process.env.ATTACHMENT_DIR || './data/attachments'),
     maxReplyChars: parsePositiveInt(process.env.MAX_REPLY_CHARS, 1500),
+    replyCodeBlockMaxChars: parsePositiveInt(process.env.REPLY_CODE_BLOCK_MAX_CHARS, 3000),
+    replyChunkDelayMs: parsePositiveInt(process.env.REPLY_CHUNK_DELAY_MS, 1000),
     maxHistoryMessages: parsePositiveInt(process.env.MAX_HISTORY_MESSAGES, 20),
     maxImageAttachments: parsePositiveInt(process.env.MAX_IMAGE_ATTACHMENTS, 3),
     inboundImageContextWindowMs: parsePositiveInt(process.env.INBOUND_IMAGE_CONTEXT_WINDOW_MS, 8000),

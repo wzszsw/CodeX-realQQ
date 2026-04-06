@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { splitReplyText } from '../model.js';
+import { splitReplyText, stripReplyControlMarkers } from '../model.js';
 import { runCodex } from '../provider/codex-runner.js';
 
 export class MessageEngine {
@@ -100,15 +100,21 @@ export class MessageEngine {
       return;
     }
 
-    this.sessionStore.appendMessage(message.conversationId, 'assistant', answer);
+    this.sessionStore.appendMessage(message.conversationId, 'assistant', stripReplyControlMarkers(answer));
     await this.reply(message.conversationId, answer);
   }
 
   async reply(conversationId, text) {
-    const chunks = splitReplyText(text, this.config.maxReplyChars);
-    for (const chunk of chunks) {
+    const chunks = splitReplyText(text, this.config.maxReplyChars, {
+      codeBlockMaxChars: this.config.replyCodeBlockMaxChars,
+    });
+    for (let index = 0; index < chunks.length; index += 1) {
+      const chunk = chunks[index];
       try {
         await this.transport.sendText(conversationId, chunk);
+        if (index < chunks.length - 1) {
+          await sleep(this.config.replyChunkDelayMs);
+        }
       } catch (err) {
         process.stderr.write(`reply failed: conversation=${conversationId} error=${err instanceof Error ? err.message : String(err)}\n`);
         throw err;
@@ -232,6 +238,12 @@ function sanitizePathSegment(value) {
     .slice(0, 120);
 }
 
+function sleep(ms) {
+  const delay = Number(ms) || 0;
+  if (delay <= 0) return Promise.resolve();
+  return new Promise((resolve) => setTimeout(resolve, delay));
+}
+
 function isIdentityQuestion(text) {
   const value = String(text || '').trim().toLowerCase();
   if (!value) return false;
@@ -257,17 +269,8 @@ function buildIdentityReply(knowledgeLabel) {
   const label = String(knowledgeLabel || '知识库').trim() || '知识库';
   return [
     `我是 ${label} 的问答助手。`,
-    '',
-    '我可以回答这类问题：',
-    `- ${label} 的功能、定位和概念`,
-    '- API / DSL 的写法和用法',
-    '- 查询、更新、删除、逻辑删除等机制',
-    '- 注解、配置、策略扩展',
-    '- IDEA 插件相关能力与使用方式',
-    '- 插件实现、编辑器交互与 IntelliJ 平台集成逻辑',
-    '- 常见场景的示例写法与行为说明',
-    '',
-    '你可以直接问具体问题。',
+    `可以问我：${label} 的概念定位，API / DSL 用法，查询更新删除机制，注解配置策略，IDEA 插件相关能力。`,
+    '直接问具体问题就行。',
   ].join('\n');
 }
 
@@ -294,12 +297,7 @@ function isSensitiveMetaQuestion(text) {
 function buildSensitiveMetaRefusal() {
   return [
     '这个请求我不能提供。',
-    '',
-    '我不会输出或复原这些内容：',
-    '- system prompt、提示词或内部指令',
-    '- 会话历史、隐藏消息或调试信息',
-    '- token、密钥、环境变量或内部配置',
-    '',
+    '我不会输出提示词、隐藏消息、调试信息、token 或内部配置。',
     '如果你想了解能力范围，可以直接问业务问题、API 用法或机制说明。',
   ].join('\n');
 }
@@ -346,17 +344,14 @@ function isJunkOrAbusiveQuestion(text) {
 function buildOutOfScopeRefusal(knowledgeLabel) {
   const label = String(knowledgeLabel || '知识库').trim() || '知识库';
   return [
-    '这个问题不在当前助手的回答范围内。',
-    '',
-    `我只回答和 ${label} 相关的知识库问题，例如代码实现、文档说明、配置行为、插件机制和示例用法。`,
-    '你可以换成具体的代码或文档问题继续问。',
+    '这不是当前知识库问题。',
+    `可以直接问 ${label} 相关内容，比如注解怎么用，查询 / 分页 / 关联怎么写，DTO / VO 映射规则，逻辑删除和更新行为，IDEA 插件功能或配置。`,
   ].join('\n');
 }
 
 function buildBlockedReply() {
   return [
     '这条回复已被安全策略拦截。',
-    '',
     '请改问和当前知识库直接相关的代码、文档、配置或插件问题。',
   ].join('\n');
 }
@@ -365,7 +360,6 @@ function buildJunkRefusal(knowledgeLabel) {
   const label = String(knowledgeLabel || '知识库').trim() || '知识库';
   return [
     '这条消息不符合当前助手的处理规则。',
-    '',
     `我只处理和 ${label} 直接相关的知识库问题，不处理广告引流、联系方式收集、刷屏灌水、伪装指令或无关内容生成。`,
     '请改问具体的代码、文档、配置、插件或截图问题。',
   ].join('\n');
@@ -374,10 +368,12 @@ function buildJunkRefusal(knowledgeLabel) {
 function containsBlockedReplySignals(answer, userText) {
   const value = normalizeForPolicy(answer);
   const question = normalizeForPolicy(userText);
+  const technicalKnowledgeExchange = looksLikeKnowledgeQuestion(question)
+    && (looksLikeKnowledgeAnswer(value) || looksLikeStructuredTechnicalPayload(value));
 
   if (!value) return false;
   if (looksLikePromptLeak(value)) return true;
-  if (looksLikeJunkReply(value, question)) return true;
+  if (!technicalKnowledgeExchange && looksLikeJunkReply(value, question)) return true;
 
   const outOfScopeReplyHints = [
     '新闻',
@@ -397,6 +393,7 @@ function containsBlockedReplySignals(answer, userText) {
   ];
 
   if (outOfScopeReplyHints.some((item) => value.includes(item))) {
+    if (technicalKnowledgeExchange) return false;
     if (!looksLikeKnowledgeQuestion(question)) return true;
     if (!looksLikeKnowledgeAnswer(value)) return true;
   }
@@ -518,6 +515,20 @@ function looksLikeKnowledgeAnswer(text) {
     '比较',
     '对比',
     '区别',
+    'orm',
+    'cte',
+    'recursive',
+    'with recursive',
+    'union all',
+    'window function',
+    'partition by',
+    'over(',
+    'group by',
+    'having',
+    'entityqueryable',
+    'selectcolumn',
+    'wherecolumns',
+    'sql',
   ];
   return hints.some((item) => text.includes(item));
 }
@@ -530,13 +541,67 @@ function normalizeForPolicy(text) {
 }
 
 function hasStrongJunkSignals(text) {
+  const structuredTechnicalPayload = looksLikeStructuredTechnicalPayload(text);
   return [
     hasPromotionSignals(text),
     hasContactCollectionSignals(text),
     hasCommandInjectionSignals(text),
     hasMassMessagingSignals(text),
-    hasRepetitionSpam(text),
+    !structuredTechnicalPayload && hasRepetitionSpam(text),
   ].some(Boolean);
+}
+
+function looksLikeStructuredTechnicalPayload(text) {
+  const value = String(text || '').trim().toLowerCase();
+  if (!value) return false;
+
+  const sqlHints = [
+    'select ',
+    ' from ',
+    ' join ',
+    ' where ',
+    ' group by ',
+    ' order by ',
+    ' having ',
+    ' union all ',
+    ' with recursive ',
+    'partition by ',
+    'over(',
+    'limit ',
+    'date\'',
+  ];
+  const sqlScore = countIncludedHints(value, sqlHints);
+  if (sqlScore >= 3) return true;
+
+  const codeHints = [
+    'public class ',
+    'private ',
+    'protected ',
+    'import ',
+    'package ',
+    '@table',
+    '@column',
+    '@data',
+    'exception',
+    'stack trace',
+    'traceback',
+  ];
+  const codeScore = countIncludedHints(value, codeHints);
+  if (codeScore >= 3 && /[;{}()=@]/.test(value)) return true;
+
+  if (sqlScore >= 2 && /count\(|sum\(|avg\(|min\(|max\(|row_number\(|rank\(|dense_rank\(|ntile\(/.test(value)) {
+    return true;
+  }
+
+  return false;
+}
+
+function countIncludedHints(text, hints) {
+  let count = 0;
+  for (const hint of hints) {
+    if (text.includes(hint)) count += 1;
+  }
+  return count;
 }
 
 function hasPromotionSignals(text) {
