@@ -60,6 +60,7 @@ export class OneBotTransport {
 
   async connect() {
     await new Promise((resolve, reject) => {
+      let settled = false;
       const headers = {};
       if (this.config.onebot.accessToken) {
         headers.Authorization = `Bearer ${this.config.onebot.accessToken}`;
@@ -70,6 +71,7 @@ export class OneBotTransport {
 
       socket.on('open', () => {
         process.stdout.write(`onebot connected: ${this.config.onebot.wsUrl}\n`);
+        settled = true;
         resolve();
       });
 
@@ -83,11 +85,19 @@ export class OneBotTransport {
       });
 
       socket.on('error', (err) => {
+        if (!settled) settled = true;
         reject(err);
       });
 
       socket.on('close', (code, reason) => {
-        process.stderr.write(`onebot disconnected: ${code} ${String(reason || '')}\n`);
+        const message = `onebot disconnected: ${code} ${String(reason || '')}`.trim();
+        process.stderr.write(`${message}\n`);
+        this.rejectPending(new Error(message));
+        this.socket = null;
+        if (!settled) {
+          settled = true;
+          reject(new Error(message));
+        }
       });
     });
 
@@ -98,6 +108,7 @@ export class OneBotTransport {
     if (payload?.echo && this.pending.has(payload.echo)) {
       const deferred = this.pending.get(payload.echo);
       this.pending.delete(payload.echo);
+      clearTimeout(deferred.timeout);
       if (payload.status === 'failed') {
         deferred.reject(new Error(payload?.wording || payload?.message || 'onebot api failed'));
       } else {
@@ -136,10 +147,22 @@ export class OneBotTransport {
     };
 
     return await new Promise((resolve, reject) => {
-      this.pending.set(echo, { resolve, reject });
+      if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+        reject(new Error('onebot websocket not connected'));
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        this.pending.delete(echo);
+        reject(new Error(`onebot api timeout: ${action}`));
+      }, this.config.onebot.apiTimeoutMs);
+      timeout.unref?.();
+
+      this.pending.set(echo, { resolve, reject, timeout });
       this.socket.send(JSON.stringify(body), (err) => {
         if (err) {
           this.pending.delete(echo);
+          clearTimeout(timeout);
           reject(err);
         }
       });
@@ -314,6 +337,17 @@ export class OneBotTransport {
     );
     if (!this.handlers.inbound) return;
     await this.handlers.inbound(message);
+  }
+
+  rejectPending(error) {
+    for (const [echo, deferred] of this.pending.entries()) {
+      this.pending.delete(echo);
+      clearTimeout(deferred.timeout);
+      try {
+        deferred.reject(error);
+      } catch {
+      }
+    }
   }
 }
 

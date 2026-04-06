@@ -37,6 +37,7 @@ export function loadConfig() {
       accessToken: String(process.env.ONEBOT_ACCESS_TOKEN || '').trim(),
       selfId: String(process.env.ONEBOT_SELF_ID || '').trim(),
       replyMode: String(process.env.ONEBOT_REPLY_MODE || 'send_msg').trim().toLowerCase(),
+      apiTimeoutMs: parsePositiveInt(process.env.ONEBOT_API_TIMEOUT_MS, 10000),
     },
   };
 }

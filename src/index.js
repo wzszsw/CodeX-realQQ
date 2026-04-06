@@ -31,7 +31,12 @@ if (config.knowledgeProjects.length) {
 }
 console.log(`read-only qa: ${config.readOnlyQaMode}`);
 
-await transport.start();
+try {
+  await transport.start();
+} catch (err) {
+  console.error(`startup failed: ${err instanceof Error ? err.message : String(err)}`);
+  process.exitCode = 1;
+}
 
 function createTransport(config) {
   if (config.appMode === 'stdin') {
