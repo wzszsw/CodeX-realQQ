@@ -95,6 +95,7 @@ export class MessageEngine {
     const answer = sanitizeReplyText(rawAnswer, this.config, originalText);
 
     if (!answer) {
+      process.stderr.write(`reply blocked by safety filter: conversation=${message.conversationId} question=${JSON.stringify(originalText.slice(0, 120))}\n`);
       await this.reply(message.conversationId, buildBlockedReply());
       return;
     }
@@ -405,7 +406,7 @@ function containsBlockedReplySignals(answer, userText) {
 
 function looksLikeJunkReply(answer, userText) {
   if (hasContactCollectionSignals(answer)) return true;
-  if (hasPromotionSignals(answer) && !looksLikeKnowledgeQuestion(userText)) return true;
+  if (hasPromotionSignals(answer) && hasContactCollectionSignals(answer) && !looksLikeKnowledgeQuestion(userText)) return true;
   if (hasCommandInjectionSignals(answer) && !looksLikeKnowledgeAnswer(answer)) return true;
   if (hasMassMessagingSignals(answer)) return true;
   return false;
@@ -427,7 +428,19 @@ function looksLikePromptLeak(text) {
 function looksLikeKnowledgeQuestion(text) {
   const hints = [
     'easy-query',
+    'easy query',
+    'easyquery',
+    'eq',
     'hibernate',
+    'mybatis',
+    'mybatis-plus',
+    'mybatis plus',
+    'mybatis-flex',
+    'mybatis flex',
+    'jooq',
+    'querydsl',
+    'spring-data-jpa',
+    'spring data jpa',
     'plugin',
     'intellij',
     'idea',
@@ -454,12 +467,29 @@ function looksLikeKnowledgeQuestion(text) {
     '异常',
     '图片',
     '截图',
+    '比较',
+    '对比',
+    '区别',
+    '优缺点',
+    '选型',
   ];
   return hints.some((item) => text.includes(item));
 }
 
 function looksLikeKnowledgeAnswer(text) {
   const hints = [
+    'easy-query',
+    'easy query',
+    'easyquery',
+    'mybatis',
+    'mybatis-plus',
+    'mybatis plus',
+    'mybatis-flex',
+    'mybatis flex',
+    'jooq',
+    'querydsl',
+    'spring-data-jpa',
+    'spring data jpa',
     'class',
     'method',
     'config',
@@ -485,6 +515,9 @@ function looksLikeKnowledgeAnswer(text) {
     '删除',
     '逻辑删除',
     '插件',
+    '比较',
+    '对比',
+    '区别',
   ];
   return hints.some((item) => text.includes(item));
 }
@@ -530,7 +563,6 @@ function hasPromotionSignals(text) {
     '免费领取',
     '点击链接',
     '扫码',
-    '官网',
   ];
   return hints.some((item) => text.includes(item));
 }
