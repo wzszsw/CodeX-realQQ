@@ -9,6 +9,8 @@ export class OneBotTransport {
     this.echoCounter = 0;
     this.pending = new Map();
     this.selfId = String(config.onebot.selfId || '').trim();
+    this.pendingImageContexts = new Map();
+    this.recentInboundContexts = new Map();
   }
 
   onInbound(handler) {
@@ -108,9 +110,21 @@ export class OneBotTransport {
 
     const message = mapOneBotMessage(payload, this.config, this.selfId, this);
     if (!message) return;
-    process.stdout.write(`onebot inbound: type=${message.chatType} conversation=${message.conversationId} sender=${message.senderId} text=${JSON.stringify(String(message.text || '').slice(0, 80))}\n`);
-    if (!this.handlers.inbound) return;
-    await this.handlers.inbound(message);
+    if (message.chatType === 'group' && !message.deliverable) {
+      this.storeRecentInboundContext(message);
+      process.stdout.write(
+        `onebot buffered-context: conversation=${message.conversationId} sender=${message.senderId} text=${JSON.stringify(String(message.text || '').slice(0, 80))} attachments=${Array.isArray(message.attachments) ? message.attachments.length : 0}\n`,
+      );
+      return;
+    }
+
+    const recentContextMessages = this.takeRecentInboundContext(message);
+    const contextualizedMessage = recentContextMessages.length > 0
+      ? mergeMessageWithRecentContext(message, recentContextMessages, this.config.maxImageAttachments)
+      : message;
+    const mergedMessage = this.processInboundContext(contextualizedMessage);
+    if (!mergedMessage) return;
+    await this.dispatchInbound(mergedMessage);
   }
 
   async callApi(action, params) {
@@ -167,6 +181,140 @@ export class OneBotTransport {
 
     return null;
   }
+
+  processInboundContext(message) {
+    const key = buildContextKey(message);
+    const text = String(message.text || '').trim();
+    const hasImages = Array.isArray(message.attachments) && message.attachments.some((item) => item?.kind === 'image');
+    const now = Number(message.timestampMs) || Date.now();
+    const pending = key ? this.pendingImageContexts.get(key) : null;
+
+    if (pending && pending.expiresAt <= now) {
+      this.clearPendingImageContext(key);
+    }
+
+    if (hasImages && !text) {
+      this.storePendingImageContext(key, message);
+      return null;
+    }
+
+    if (message.deliverable && pending && pending.expiresAt > now) {
+      this.clearPendingImageContext(key);
+      return {
+        ...message,
+        attachments: mergeImageAttachments(
+          pending.message.attachments,
+          message.attachments,
+          this.config.maxImageAttachments,
+        ),
+      };
+    }
+
+    return message.deliverable ? message : null;
+  }
+
+  storePendingImageContext(key, message) {
+    if (!key) return;
+
+    const current = this.pendingImageContexts.get(key);
+    if (current?.timer) {
+      clearTimeout(current.timer);
+    }
+
+    const mergedMessage = current
+      ? {
+          ...message,
+          attachments: mergeImageAttachments(
+            current.message.attachments,
+            message.attachments,
+            this.config.maxImageAttachments,
+          ),
+        }
+      : message;
+
+    const windowMs = this.config.inboundImageContextWindowMs;
+    const expiresAt = (Number(message.timestampMs) || Date.now()) + windowMs;
+    const deliverOnTimeout = message.chatType === 'private' || message.mentioned;
+    const timer = setTimeout(async () => {
+      const latest = this.pendingImageContexts.get(key);
+      if (!latest) return;
+      this.pendingImageContexts.delete(key);
+      if (!latest.deliverOnTimeout) return;
+      try {
+        await this.dispatchInbound(latest.message);
+      } catch (err) {
+        process.stderr.write(`onebot delayed inbound failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      }
+    }, windowMs);
+    timer.unref?.();
+
+    this.pendingImageContexts.set(key, {
+      message: mergedMessage,
+      expiresAt,
+      deliverOnTimeout,
+      timer,
+    });
+
+    process.stdout.write(
+      `onebot pending-image: conversation=${message.conversationId} sender=${message.senderId} images=${mergedMessage.attachments.length} deliverOnTimeout=${deliverOnTimeout}\n`,
+    );
+  }
+
+  clearPendingImageContext(key) {
+    if (!key) return;
+    const current = this.pendingImageContexts.get(key);
+    if (current?.timer) {
+      clearTimeout(current.timer);
+    }
+    this.pendingImageContexts.delete(key);
+  }
+
+  storeRecentInboundContext(message) {
+    const key = buildContextKey(message);
+    if (!key) return;
+
+    const now = Number(message.timestampMs) || Date.now();
+    const windowMs = this.config.recentInboundContextWindowMs;
+    const maxMessages = this.config.recentInboundContextMaxMessages;
+    const current = this.pruneRecentInboundContext(key, now);
+
+    current.push({
+      text: String(message.text || '').trim(),
+      attachments: normalizeImageAttachments(message.attachments),
+      timestampMs: now,
+    });
+
+    const trimmed = current.slice(-Math.max(1, maxMessages));
+    this.recentInboundContexts.set(key, trimmed);
+  }
+
+  takeRecentInboundContext(message) {
+    const key = buildContextKey(message);
+    if (!key) return [];
+    const current = this.pruneRecentInboundContext(key, Number(message.timestampMs) || Date.now());
+    this.recentInboundContexts.delete(key);
+    return current;
+  }
+
+  pruneRecentInboundContext(key, now) {
+    const current = Array.isArray(this.recentInboundContexts.get(key)) ? this.recentInboundContexts.get(key) : [];
+    const windowMs = this.config.recentInboundContextWindowMs;
+    const filtered = current.filter((item) => (now - Number(item.timestampMs || 0)) <= windowMs);
+    if (filtered.length > 0) {
+      this.recentInboundContexts.set(key, filtered);
+    } else {
+      this.recentInboundContexts.delete(key);
+    }
+    return filtered;
+  }
+
+  async dispatchInbound(message) {
+    process.stdout.write(
+      `onebot inbound: type=${message.chatType} conversation=${message.conversationId} sender=${message.senderId} text=${JSON.stringify(String(message.text || '').slice(0, 80))} attachments=${Array.isArray(message.attachments) ? message.attachments.length : 0}\n`,
+    );
+    if (!this.handlers.inbound) return;
+    await this.handlers.inbound(message);
+  }
 }
 
 function mapOneBotMessage(payload, config, selfId, transportRef) {
@@ -182,38 +330,115 @@ function mapOneBotMessage(payload, config, selfId, transportRef) {
     }
 
     const mentioned = isMentioningSelf(payload.message, selfId);
-    if (!mentioned) return null;
-
-    return createInboundMessage({
+    return {
+      ...createInboundMessage({
       transport: 'onebot',
       conversationId: `group:${groupId}`,
       senderId: userId,
       chatType: 'group',
       messageId: stringifyId(payload.message_id) || `group-${groupId}-${Date.now()}`,
       text: sanitizeGroupText(rawText, selfId),
+      originalText: sanitizeGroupText(rawText, selfId),
       attachments,
       transportRef,
       mentioned,
       timestampMs: Number(payload.time || 0) * 1000 || Date.now(),
-    });
+      }),
+      deliverable: mentioned,
+    };
   }
 
   if (messageType === 'private') {
-    return createInboundMessage({
+    return {
+      ...createInboundMessage({
       transport: 'onebot',
       conversationId: `private:${userId}`,
       senderId: userId,
       chatType: 'private',
       messageId: stringifyId(payload.message_id) || `private-${userId}-${Date.now()}`,
       text: rawText,
+      originalText: rawText,
       attachments,
       transportRef,
       mentioned: true,
       timestampMs: Number(payload.time || 0) * 1000 || Date.now(),
-    });
+      }),
+      deliverable: true,
+    };
   }
 
   return null;
+}
+
+function buildContextKey(message) {
+  const conversationId = String(message?.conversationId || '').trim();
+  const senderId = String(message?.senderId || '').trim();
+  if (!conversationId || !senderId) return '';
+  return `${conversationId}::${senderId}`;
+}
+
+function mergeImageAttachments(first, second, limit) {
+  const merged = [...normalizeImageAttachments(first), ...normalizeImageAttachments(second)];
+  const output = [];
+  const seen = new Set();
+
+  for (const item of merged) {
+    const key = String(item.id || item.file || item.url || '').trim();
+    if (key && seen.has(key)) continue;
+    if (key) seen.add(key);
+    output.push(item);
+    if (output.length >= limit) break;
+  }
+
+  return output;
+}
+
+function normalizeImageAttachments(items) {
+  if (!Array.isArray(items)) return [];
+  return items.filter((item) => item?.kind === 'image');
+}
+
+function mergeMessageWithRecentContext(message, contextMessages, maxImageAttachments) {
+  const recent = Array.isArray(contextMessages) ? contextMessages : [];
+  if (recent.length === 0) return message;
+
+  const contextText = buildRecentContextText(recent);
+  const currentText = String(message.text || '').trim();
+  const mergedText = contextText
+    ? [contextText, currentText ? `本次提问：\n${currentText}` : '本次提问：\n请结合上面的上下文与图片回答。'].join('\n\n')
+    : currentText;
+
+  return {
+    ...message,
+    text: mergedText,
+    originalText: String(message.originalText || message.text || '').trim(),
+    attachments: mergeImageAttachments(
+      recent.flatMap((item) => normalizeImageAttachments(item.attachments)),
+      message.attachments,
+      maxImageAttachments,
+    ),
+  };
+}
+
+function buildRecentContextText(contextMessages) {
+  const lines = contextMessages
+    .map((item, index) => formatContextLine(item, index + 1))
+    .filter(Boolean);
+
+  if (lines.length === 0) return '';
+  return ['最近聊天上下文（同一发送者）：', ...lines].join('\n');
+}
+
+function formatContextLine(item, index) {
+  const text = String(item?.text || '').trim();
+  const imageCount = normalizeImageAttachments(item?.attachments).length;
+  const parts = [];
+
+  if (text) parts.push(text);
+  if (imageCount > 0) parts.push(`附${imageCount}张图片`);
+  if (parts.length === 0) return '';
+
+  return `${index}. ${parts.join('，')}`;
 }
 
 function extractOneBotText(message) {

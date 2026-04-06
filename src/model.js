@@ -1,11 +1,13 @@
 export function createInboundMessage(input = {}) {
+  const text = String(input.text || '');
   return {
     transport: String(input.transport || '').trim() || 'unknown',
     conversationId: String(input.conversationId || '').trim(),
     senderId: String(input.senderId || '').trim(),
     chatType: String(input.chatType || '').trim() || 'private',
     messageId: String(input.messageId || '').trim(),
-    text: String(input.text || ''),
+    text,
+    originalText: typeof input.originalText === 'string' ? input.originalText : text,
     attachments: Array.isArray(input.attachments) ? input.attachments : [],
     transportRef: input.transportRef || null,
     mentioned: Boolean(input.mentioned),

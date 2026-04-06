@@ -12,26 +12,27 @@ export class MessageEngine {
 
   async handleInbound(message) {
     const text = String(message.text || '').trim();
+    const originalText = String(message.originalText || text).trim();
     const attachments = Array.isArray(message.attachments) ? message.attachments : [];
     if (!text && attachments.length === 0) return;
     process.stdout.write(`engine inbound: conversation=${message.conversationId} text=${JSON.stringify(text.slice(0, 80))} attachments=${attachments.length}\n`);
 
-    if (isIdentityQuestion(text)) {
+    if (isIdentityQuestion(originalText)) {
       await this.reply(message.conversationId, buildIdentityReply(this.config.knowledgeLabel));
       return;
     }
 
-    if (isSensitiveMetaQuestion(text)) {
+    if (isSensitiveMetaQuestion(originalText)) {
       await this.reply(message.conversationId, buildSensitiveMetaRefusal());
       return;
     }
 
-    if (isOutOfScopeQuestion(text)) {
+    if (isOutOfScopeQuestion(originalText)) {
       await this.reply(message.conversationId, buildOutOfScopeRefusal(this.config.knowledgeLabel));
       return;
     }
 
-    if (isJunkOrAbusiveQuestion(text)) {
+    if (isJunkOrAbusiveQuestion(originalText)) {
       await this.reply(message.conversationId, buildJunkRefusal(this.config.knowledgeLabel));
       return;
     }
@@ -91,7 +92,7 @@ export class MessageEngine {
     const rawAnswer = this.config.showReasoning && result.reasonings.length
       ? ['[Reasoning]', result.reasonings.join('\n\n'), '', '[Answer]', result.text].join('\n')
       : result.text || '已完成，但没有返回文本。';
-    const answer = sanitizeReplyText(rawAnswer, this.config, text);
+    const answer = sanitizeReplyText(rawAnswer, this.config, originalText);
 
     if (!answer) {
       await this.reply(message.conversationId, buildBlockedReply());

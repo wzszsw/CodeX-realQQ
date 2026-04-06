@@ -20,6 +20,9 @@ export function loadConfig() {
     maxReplyChars: parsePositiveInt(process.env.MAX_REPLY_CHARS, 1500),
     maxHistoryMessages: parsePositiveInt(process.env.MAX_HISTORY_MESSAGES, 20),
     maxImageAttachments: parsePositiveInt(process.env.MAX_IMAGE_ATTACHMENTS, 3),
+    inboundImageContextWindowMs: parsePositiveInt(process.env.INBOUND_IMAGE_CONTEXT_WINDOW_MS, 8000),
+    recentInboundContextWindowMs: parsePositiveInt(process.env.RECENT_INBOUND_CONTEXT_WINDOW_MS, 300000),
+    recentInboundContextMaxMessages: parsePositiveInt(process.env.RECENT_INBOUND_CONTEXT_MAX_MESSAGES, 6),
     showReasoning: String(process.env.SHOW_REASONING || 'false').toLowerCase() === 'true',
     qq: {
       accountUin: String(process.env.QQ_ACCOUNT_UIN || '').trim(),
