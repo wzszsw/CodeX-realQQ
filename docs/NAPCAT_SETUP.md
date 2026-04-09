@@ -69,7 +69,7 @@ CODEX_BIN=C:\Users\l1622\.version-fox\cache\nodejs\current\node.exe
 
 KNOWLEDGE_ROOT=D:\develop\SOURCE_CODE\easy-query
 KNOWLEDGE_LABEL=easy-query
-KNOWLEDGE_PROJECTS=easy-query,easy-query-plugin,intellij-community
+KNOWLEDGE_PROJECTS=easy-query,easy-query-doc,easy-query-plugin,intellij-community
 READ_ONLY_QA_MODE=true
 SESSION_STORE_FILE=./data/sessions.json
 ATTACHMENT_DIR=./data/attachments
@@ -126,7 +126,7 @@ Expected logs:
 CodeX-realQQ starting
 mode: onebot
 knowledge label: easy-query
-knowledge projects: easy-query, easy-query-plugin, intellij-community
+knowledge projects: easy-query, easy-query-doc, easy-query-plugin, intellij-community
 read-only qa: true
 onebot connected: ws://127.0.0.1:3001
 onebot self id: 3772046889

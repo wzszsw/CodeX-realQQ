@@ -123,6 +123,7 @@ function buildPrompt(config, userText, session, imagePaths = []) {
     .map((item) => `${item.role}: ${item.text}`)
     .join('\n');
   const projectScope = formatKnowledgeProjectScope(config.knowledgeProjects);
+  const easyQueryDocRules = buildEasyQueryDocRules(config);
 
   const instructions = [
     'You are a knowledge-base Q&A assistant.',
@@ -158,6 +159,9 @@ function buildPrompt(config, userText, session, imagePaths = []) {
     projectScope ? `Knowledge scope: ${projectScope}` : '',
     projectScope ? 'When the question is about easy-query itself, prioritize the main easy-query sources. Use plugin or IntelliJ Platform sources only when the question is clearly about the IDEA plugin, editor integration, or platform behavior.' : '',
     projectScope ? 'If multiple projects are relevant, combine them into one concise answer instead of listing your search process.' : '',
+    easyQueryDocRules ? 'When the question is about usage, configuration, built-in functions, examples, or chapterized docs, prefer easy-query-doc when it directly answers the question.' : '',
+    easyQueryDocRules ? 'If you rely on easy-query-doc content, include the matching public chapter URL in the answer and do not output only the local markdown path.' : '',
+    easyQueryDocRules || '',
     `If you need to refer to the knowledge base, call it "${config.knowledgeLabel}".`,
     `If the user asks who you are, say "我是 ${config.knowledgeLabel} 的问答助手。" and then briefly list the kinds of questions you can answer, such as concepts, API usage, query/update/delete behavior, annotations, configuration, and strategy extensions.`,
     'Keep the answer concise and user-focused. Default to a short answer unless the user clearly asks for depth.',
@@ -271,4 +275,24 @@ function isProgressNarration(line) {
 function formatKnowledgeProjectScope(projects) {
   const items = Array.isArray(projects) ? projects.map((item) => String(item || '').trim()).filter(Boolean) : [];
   return items.join(', ');
+}
+
+function buildEasyQueryDocRules(config) {
+  if (!hasEasyQueryDoc(config)) return '';
+  return [
+    'easy-query-doc URL rules:',
+    '1. easy-query-doc/src/<path>.md -> https://www.easy-query.com/easy-query-doc/<path>.html',
+    '2. easy-query-doc/src/<dir>/README.md or readme.md -> https://www.easy-query.com/easy-query-doc/<dir>/',
+    '3. easy-query-doc/src/README.md -> https://www.easy-query.com/easy-query-doc/',
+    '4. Example: easy-query-doc/src/func/datetime.md -> https://www.easy-query.com/easy-query-doc/func/datetime.html',
+    '5. If multiple chapters are central, include the 1 to 3 most relevant URLs only.',
+  ].join('\n');
+}
+
+function hasEasyQueryDoc(config) {
+  const root = String(config.knowledgeRoot || '').trim();
+  if (!root) return false;
+
+  const candidates = [root, path.join(root, 'easy-query-doc')];
+  return candidates.some((candidate) => fs.existsSync(path.join(candidate, 'src', 'README.md')));
 }

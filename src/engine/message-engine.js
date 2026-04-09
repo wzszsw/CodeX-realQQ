@@ -127,6 +127,13 @@ function sanitizeReplyText(text, config, userText = '') {
   let output = String(text || '');
   const knowledgeRoot = String(config.knowledgeRoot || '').trim();
   const knowledgeLabel = String(config.knowledgeLabel || 'knowledge-base').trim() || 'knowledge-base';
+  const protectedUrls = [];
+
+  output = output.replace(/https?:\/\/[^\s"'`<>]+/gi, (match) => {
+    const token = `__URL_${protectedUrls.length}__`;
+    protectedUrls.push(match);
+    return token;
+  });
 
   if (knowledgeRoot) {
     const escapedRoot = escapeRegex(knowledgeRoot.replace(/\//g, '\\'));
@@ -137,6 +144,7 @@ function sanitizeReplyText(text, config, userText = '') {
 
   output = output.replace(/[A-Za-z]:\\[^\s"'`]+/g, knowledgeLabel);
   output = output.replace(/\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+){2,}/g, knowledgeLabel);
+  output = output.replace(/__URL_(\d+)__/g, (_, index) => protectedUrls[Number(index)] || '');
   output = output.trim();
 
   if (!output) return '';

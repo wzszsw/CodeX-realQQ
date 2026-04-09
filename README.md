@@ -70,7 +70,7 @@ Set it in `.env`:
 ```env
 KNOWLEDGE_ROOT=D:\develop\SOURCE_CODE\easy-query
 KNOWLEDGE_LABEL=easy-query
-KNOWLEDGE_PROJECTS=easy-query,easy-query-plugin,intellij-community
+KNOWLEDGE_PROJECTS=easy-query,easy-query-doc,easy-query-plugin,intellij-community
 ```
 
 Meaning:
@@ -148,7 +148,7 @@ CODEX_BIN=C:\Users\l1622\.version-fox\cache\nodejs\current\node.exe
 
 KNOWLEDGE_ROOT=D:\develop\SOURCE_CODE\easy-query
 KNOWLEDGE_LABEL=easy-query
-KNOWLEDGE_PROJECTS=easy-query,easy-query-plugin,intellij-community
+KNOWLEDGE_PROJECTS=easy-query,easy-query-doc,easy-query-plugin,intellij-community
 READ_ONLY_QA_MODE=true
 SESSION_STORE_FILE=./data/sessions.json
 ATTACHMENT_DIR=./data/attachments
@@ -172,7 +172,8 @@ Notes:
 
 - `KNOWLEDGE_ROOT` can be a parent directory containing multiple projects.
 - `KNOWLEDGE_LABEL` is the public-facing name used in replies instead of the local path.
-- `KNOWLEDGE_PROJECTS` is a comma-separated list of the main projects inside the knowledge base, useful for setups like `easy-query`, `easy-query-plugin`, and `intellij-community`.
+- `KNOWLEDGE_PROJECTS` is a comma-separated list of the main projects inside the knowledge base, useful for setups like `easy-query`, `easy-query-doc`, `easy-query-plugin`, and `intellij-community`.
+- If `easy-query-doc` exists under `KNOWLEDGE_ROOT`, answers based on the docs should include the matching public chapter URL, for example `https://www.easy-query.com/easy-query-doc/func/datetime.html`.
 - When the question is about core `easy-query` behavior, the bridge will prioritize the main project and only pull in plugin or IntelliJ Platform sources when the question is clearly about IDEA integration or platform internals.
 - `CODEX_BIN` may be `codex` if your environment resolves it correctly.
 - On some Windows setups, using `node.exe` directly is more reliable than using a wrapper command.
@@ -203,7 +204,7 @@ Expected startup logs:
 CodeX-realQQ starting
 mode: onebot
 knowledge label: easy-query
-knowledge projects: easy-query, easy-query-plugin, intellij-community
+knowledge projects: easy-query, easy-query-doc, easy-query-plugin, intellij-community
 read-only qa: true
 onebot connected: ws://127.0.0.1:3001
 onebot self id: 3772046889
