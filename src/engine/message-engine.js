@@ -83,7 +83,7 @@ export class MessageEngine {
     const result = await runProvider(this.config, session, promptText, { imagePaths });
     if (!result.ok) {
       await this.reply(message.conversationId, [
-        `${getProviderLabel(this.config)} 执行失败`,
+        `${getProviderLabel(result.provider || this.config)} 执行失败`,
         `error: ${result.error || '(unknown)'}`,
         result.logs.length ? `logs: ${result.logs.join(' | ')}` : '',
       ].filter(Boolean).join('\n'));

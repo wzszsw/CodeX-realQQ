@@ -10,6 +10,7 @@ export function buildProviderPrompt(config, userText, session, imagePaths = []) 
     .join('\n');
   const projectScope = formatKnowledgeProjectScope(config.knowledgeProjects);
   const easyQueryDocRules = buildEasyQueryDocRules(config);
+  const attachedImageLine = formatAttachedImageLine(imagePaths);
 
   const instructions = [
     'You are a knowledge-base Q&A assistant.',
@@ -59,9 +60,21 @@ export function buildProviderPrompt(config, userText, session, imagePaths = []) 
   return [
     instructions,
     historyText ? `Conversation history:\n${historyText}` : '',
-    imagePaths.length ? `Attached images: ${imagePaths.map((_, index) => `image_${index + 1}`).join(', ')}` : '',
+    attachedImageLine,
     `User question:\n${String(userText || '').trim()}`,
   ].filter(Boolean).join('\n\n');
+}
+
+function formatAttachedImageLine(imagePaths) {
+  const items = Array.isArray(imagePaths) ? imagePaths.map((item) => String(item || '').trim()).filter(Boolean) : [];
+  if (items.length === 0) return '';
+
+  const hasDirectRefs = items.some((item) => item.startsWith('@'));
+  if (hasDirectRefs) {
+    return `Attached images: ${items.join(', ')}`;
+  }
+
+  return `Attached images: ${items.map((_, index) => `image_${index + 1}`).join(', ')}`;
 }
 
 function formatKnowledgeProjectScope(projects) {

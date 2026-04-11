@@ -180,7 +180,7 @@ Notes:
 - `KNOWLEDGE_PROJECTS` is a comma-separated list of the main projects inside the knowledge base, useful for setups like `easy-query`, `easy-query-doc`, `easy-query-plugin`, and `intellij-community`.
 - If `easy-query-doc` exists under `KNOWLEDGE_ROOT`, answers based on the docs should include the matching public chapter URL, for example `https://www.easy-query.com/easy-query-doc/func/datetime.html`.
 - When the question is about core `easy-query` behavior, the bridge will prioritize the main project and only pull in plugin or IntelliJ Platform sources when the question is clearly about IDEA integration or platform internals.
-- `LLM_PROVIDER`: selects the CLI provider, currently `codex` or `gemini`
+- `LLM_PROVIDER`: selects the preferred CLI provider, currently `codex` or `gemini`; if the preferred provider fails, the bridge automatically tries the other one
 - `CODEX_BIN`: executable entry when `LLM_PROVIDER=codex`
 - `GEMINI_BIN`: executable entry when `LLM_PROVIDER=gemini`
 - `GEMINI_MODEL`: optional Gemini CLI `--model` value
@@ -252,7 +252,7 @@ Image flow:
 
 1. NapCatQQ reports image segments through OneBot.
 2. The bridge materializes the images into `ATTACHMENT_DIR`.
-3. Local image paths are attached through the current provider when supported; `codex` uses `-i`, and `gemini` uses `@relative/path` file references in the prompt.
+3. Local image paths are attached through the current provider when supported; `codex` uses `-i`, and `gemini` uses `@path` file references plus `--include-directories` for temporary attachment directories.
 
 ## Privacy and Safety
 

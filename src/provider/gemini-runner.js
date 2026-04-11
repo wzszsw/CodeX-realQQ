@@ -7,6 +7,9 @@ export async function runGemini(config, session, userText, options = {}) {
   const imagePaths = Array.isArray(options.imagePaths) ? options.imagePaths : [];
   const prompt = buildGeminiPrompt(config, userText, session, imagePaths);
   const args = ['--prompt', prompt, '--output-format', 'json'];
+  for (const includeDir of buildGeminiIncludeDirs(config, imagePaths)) {
+    args.push('--include-directories', includeDir);
+  }
 
   if (config.geminiModel) {
     args.push('--model', config.geminiModel);
@@ -81,10 +84,31 @@ function buildLogs(stderrBuf, imagePaths, ...extraLogs) {
     .filter(Boolean);
   logs.push(...stderrLines);
   if (imagePaths.length > 0) {
-    logs.push('gemini adapter: image attachments are not forwarded directly');
+    logs.push('gemini adapter: image attachments passed via @path prompt references with include-directories for external files');
   }
   logs.push(...extraLogs.filter(Boolean));
   return dedupe(logs);
+}
+
+function buildGeminiIncludeDirs(config, imagePaths) {
+  const rootDir = String(config.knowledgeRoot || '').trim();
+  const dirs = [];
+
+  for (const imagePath of Array.isArray(imagePaths) ? imagePaths : []) {
+    const filePath = String(imagePath || '').trim();
+    if (!filePath) continue;
+    const dir = path.dirname(filePath);
+    if (isInsideDir(rootDir, filePath)) continue;
+    dirs.push(dir);
+  }
+
+  return dedupe(dirs).map((dir) => dir.replace(/\\/g, '/'));
+}
+
+function isInsideDir(rootDir, filePath) {
+  if (!rootDir || !filePath) return false;
+  const relativePath = path.relative(rootDir, filePath);
+  return Boolean(relativePath) && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
 }
 
 function resolveGeminiCommand(geminiBin, args) {

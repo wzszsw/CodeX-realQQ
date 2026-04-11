@@ -179,7 +179,7 @@ QQ_POLL_INTERVAL_MS=1500
 - `KNOWLEDGE_LABEL` 是对外展示的知识库名字，用来替代本地真实路径。
 - `KNOWLEDGE_PROJECTS` 用逗号列出知识库中的重点项目，适合 `easy-query`、`easy-query-plugin`、`intellij-community` 这类多项目场景。
 - 当问题是 `easy-query` 本体功能时，系统会优先基于主项目回答；只有明显涉及 IDEA 插件或 IntelliJ 平台时，才补充读取插件和平台源码。
-- `LLM_PROVIDER`：选择底层 CLI provider，当前支持 `codex` 和 `gemini`
+- `LLM_PROVIDER`：选择优先使用的 CLI provider，当前支持 `codex` 和 `gemini`；如果优先 provider 执行失败，会自动尝试另一个
 - `CODEX_BIN`：如果选择 `codex`，这里填 Codex 可执行入口
 - `GEMINI_BIN`：如果选择 `gemini`，这里填 Gemini CLI 可执行入口
 - `GEMINI_MODEL`：可选，指定 Gemini CLI 的 `--model`
@@ -250,7 +250,7 @@ onebot self id: 3772046889
 
 1. NapCatQQ 通过 OneBot 上报图片消息段
 2. 桥接程序把图片落到 `ATTACHMENT_DIR`
-3. 再通过当前 provider 支持的方式把图片传给底层 CLI；当前 `codex` 使用 `-i`，`gemini` 使用 prompt 中的 `@相对路径` 文件引用
+3. 再通过当前 provider 支持的方式把图片传给底层 CLI；当前 `codex` 使用 `-i`，`gemini` 使用 prompt 中的 `@路径` 文件引用，并通过 `--include-directories` 允许读取临时附件目录
 
 ## 隐私与安全
 

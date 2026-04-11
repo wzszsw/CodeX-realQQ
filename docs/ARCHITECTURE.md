@@ -120,7 +120,8 @@ Current provider contract:
 Current provider choices:
 
 - `codex`: full current path, including direct image forwarding through `codex exec -i`
-- `gemini`: prompt-based CLI adapter through `gemini --prompt --output-format json`; local images are referenced in the prompt with `@path`
+- `gemini`: prompt-based CLI adapter through `gemini --prompt --output-format json`; local images are referenced in the prompt with `@path`, and attachment directories outside `KNOWLEDGE_ROOT` are passed through `--include-directories`
+- if the configured primary provider fails, the dispatcher automatically tries the other provider before returning an error
 
 ### `session`
 
