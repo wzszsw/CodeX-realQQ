@@ -22,8 +22,8 @@ The design target is:
 4. `CodeX-realQQ` connects to that WebSocket server as a client.
 5. Incoming OneBot events are mapped into an internal message model.
 6. The message engine handles commands, session history, image materialization, and prompt preparation.
-7. The provider starts a local Codex CLI process.
-8. Codex reads from the configured knowledge base and returns a final answer.
+7. The provider starts the configured local CLI provider process.
+8. The selected provider reads from the configured knowledge base and returns a final answer.
 9. The answer is sanitized and sent back to QQ through NapCatQQ.
 
 ## Normalized Message Model
@@ -101,19 +101,26 @@ Current command set:
 
 Responsible for:
 
-- launching Codex CLI
-- passing prompt text and attached images
-- parsing JSON event output
+- launching the selected CLI provider
+- passing prompt text and attached images when supported
+- parsing provider output into a normalized result
 - returning final answer text, reasoning, logs, and status
 
 Current implementation:
 
+- [src/provider/index.js](../src/provider/index.js)
 - [src/provider/codex-runner.js](../src/provider/codex-runner.js)
+- [src/provider/gemini-runner.js](../src/provider/gemini-runner.js)
 
 Current provider contract:
 
 - input: config, session, user text, image paths
 - output: `ok`, `error`, `text`, `reasonings`, `logs`, `threadId`
+
+Current provider choices:
+
+- `codex`: full current path, including direct image forwarding through `codex exec -i`
+- `gemini`: prompt-based CLI adapter through `gemini --prompt --output-format json`; local images are referenced in the prompt with `@path`
 
 ### `session`
 

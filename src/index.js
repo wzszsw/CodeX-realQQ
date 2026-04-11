@@ -5,6 +5,7 @@ import { MessageEngine } from './engine/message-engine.js';
 import { FileSessionStore } from './session/file-session-store.js';
 import { StdinTransport } from './transport/stdin-transport.js';
 import { OneBotTransport } from './transport/onebot-transport.js';
+import { getProviderLabel } from './provider/index.js';
 
 const config = loadConfig();
 
@@ -24,6 +25,8 @@ transport.onInbound(async (message) => {
 
 console.log(`CodeX-realQQ starting`);
 console.log(`mode: ${config.appMode}`);
+console.log(`provider: ${config.provider}`);
+console.log(`provider label: ${getProviderLabel(config)}`);
 console.log(`knowledge label: ${config.knowledgeLabel}`);
 console.log(`knowledge root: ${config.knowledgeRoot}`);
 if (config.knowledgeProjects.length) {

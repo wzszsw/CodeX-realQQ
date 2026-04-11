@@ -5,7 +5,7 @@
 - 官方 QQ NT
 - NapCatQQ
 - OneBot 11 WebSocket
-- 本机 Codex CLI
+- 本机 Codex CLI / Gemini CLI
 - 只读知识库问答层
 
 它适合做这些事情：
@@ -19,7 +19,7 @@
 
 ## 它是什么
 
-收到 QQ 消息后，系统会把消息转发给本机的 Codex CLI。Codex 在指定的本地知识库目录里只读检索和分析，然后把回答通过 NapCatQQ 发回 QQ。
+收到 QQ 消息后，系统会把消息转发给本机已配置的 CLI provider。provider 会在指定的本地知识库目录里只读检索和分析，然后把回答通过 NapCatQQ 发回 QQ。
 
 当前支持：
 
@@ -51,8 +51,8 @@
 2. NapCatQQ 注入 QQ NT，并暴露本地 OneBot 11 WebSocket
 3. `CodeX-realQQ` 作为客户端连接这个 WebSocket
 4. 收到的消息被标准化成内部消息模型
-5. 文本和图片一起交给本机 Codex CLI
-6. Codex 读取配置的知识库并生成回答
+5. 文本和图片一起交给本机配置的 CLI provider
+6. provider 读取配置的知识库并生成回答
 7. 回答经过清洗后再通过 NapCatQQ 发回 QQ
 
 核心代码位置：
@@ -60,7 +60,9 @@
 - [src/index.js](./src/index.js)
 - [src/transport/onebot-transport.js](./src/transport/onebot-transport.js)
 - [src/engine/message-engine.js](./src/engine/message-engine.js)
+- [src/provider/index.js](./src/provider/index.js)
 - [src/provider/codex-runner.js](./src/provider/codex-runner.js)
+- [src/provider/gemini-runner.js](./src/provider/gemini-runner.js)
 - [src/session/file-session-store.js](./src/session/file-session-store.js)
 
 ### 如何指定知识库位置
@@ -143,8 +145,11 @@ Copy-Item .env.napcat.example .env
 
 ```env
 APP_MODE=onebot
+LLM_PROVIDER=codex
 
 CODEX_BIN=C:\Users\l1622\.version-fox\cache\nodejs\current\node.exe
+GEMINI_BIN=gemini
+GEMINI_MODEL=
 
 KNOWLEDGE_ROOT=D:\develop\SOURCE_CODE\easy-query
 KNOWLEDGE_LABEL=easy-query
@@ -174,8 +179,10 @@ QQ_POLL_INTERVAL_MS=1500
 - `KNOWLEDGE_LABEL` 是对外展示的知识库名字，用来替代本地真实路径。
 - `KNOWLEDGE_PROJECTS` 用逗号列出知识库中的重点项目，适合 `easy-query`、`easy-query-plugin`、`intellij-community` 这类多项目场景。
 - 当问题是 `easy-query` 本体功能时，系统会优先基于主项目回答；只有明显涉及 IDEA 插件或 IntelliJ 平台时，才补充读取插件和平台源码。
-- `CODEX_BIN` 如果环境里直接能跑 `codex`，可以写成 `codex`。
-- 在部分 Windows 环境中，直接写 `node.exe` 会比包装命令更稳定。
+- `LLM_PROVIDER`：选择底层 CLI provider，当前支持 `codex` 和 `gemini`
+- `CODEX_BIN`：如果选择 `codex`，这里填 Codex 可执行入口
+- `GEMINI_BIN`：如果选择 `gemini`，这里填 Gemini CLI 可执行入口
+- `GEMINI_MODEL`：可选，指定 Gemini CLI 的 `--model`
 - `ONEBOT_SELF_ID` 可以先留空，桥接会自动通过 `get_login_info` 获取。
 - 测试阶段可先把 `QQ_TARGET_GROUPS` 留空，不限制群。
 
@@ -201,6 +208,8 @@ node src/index.js
 ```text
 CodeX-realQQ starting
 mode: onebot
+provider: codex
+provider label: Codex
 knowledge label: easy-query
 knowledge projects: easy-query, easy-query-doc, easy-query-plugin, intellij-community
 read-only qa: true
@@ -241,7 +250,7 @@ onebot self id: 3772046889
 
 1. NapCatQQ 通过 OneBot 上报图片消息段
 2. 桥接程序把图片落到 `ATTACHMENT_DIR`
-3. 再通过 `codex exec -i` 把图片传给本机 Codex CLI
+3. 再通过当前 provider 支持的方式把图片传给底层 CLI；当前 `codex` 使用 `-i`，`gemini` 使用 prompt 中的 `@相对路径` 文件引用
 
 ## 隐私与安全
 

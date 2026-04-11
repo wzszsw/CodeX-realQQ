@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { splitReplyText, stripReplyControlMarkers } from '../model.js';
-import { runCodex } from '../provider/codex-runner.js';
+import { getProviderLabel, runProvider } from '../provider/index.js';
 
 export class MessageEngine {
   constructor(config, transport, sessionStore) {
@@ -55,6 +55,7 @@ export class MessageEngine {
         `conversation: ${session.id}`,
         `history: ${session.history.length}`,
         `knowledge: ${this.config.knowledgeLabel}`,
+        `provider: ${this.config.provider}`,
         `mode: ${this.config.readOnlyQaMode ? 'read-only qa' : 'normal'}`,
       ].join('\n'));
       return;
@@ -79,10 +80,10 @@ export class MessageEngine {
       process.stdout.write(`attachments received: total=${attachments.length}, images=${attachments.filter((item) => item?.kind === 'image').length}, downloaded=${imagePaths.length}\n`);
     }
     const promptText = text || buildAttachmentOnlyPrompt(attachments);
-    const result = await runCodex(this.config, session, promptText, { imagePaths });
+    const result = await runProvider(this.config, session, promptText, { imagePaths });
     if (!result.ok) {
       await this.reply(message.conversationId, [
-        'Codex 执行失败',
+        `${getProviderLabel(this.config)} 执行失败`,
         `error: ${result.error || '(unknown)'}`,
         result.logs.length ? `logs: ${result.logs.join(' | ')}` : '',
       ].filter(Boolean).join('\n'));

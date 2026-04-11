@@ -5,7 +5,7 @@
 - official QQ NT
 - NapCatQQ
 - OneBot 11 WebSocket
-- local Codex CLI
+- local Codex CLI or Gemini CLI
 - a read-only knowledge-base Q&A layer
 
 It is intended for scenarios such as:
@@ -19,7 +19,7 @@ The current implementation is generic. It does not need to be bound to a single 
 
 ## What It Does
 
-Incoming QQ messages are forwarded to a local Codex CLI process, which reads from a configured local knowledge-base directory and returns a textual answer. Replies are sent back to QQ through NapCatQQ.
+Incoming QQ messages are forwarded to the configured local CLI provider, which reads from a configured local knowledge-base directory and returns a textual answer. Replies are sent back to QQ through NapCatQQ.
 
 Supported message patterns:
 
@@ -51,8 +51,8 @@ Runtime flow:
 2. NapCatQQ injects into QQ NT and exposes a local OneBot 11 WebSocket server.
 3. `CodeX-realQQ` connects to that WebSocket server as a client.
 4. Incoming messages are normalized into the bridge's internal message model.
-5. Text and image attachments are passed to a local Codex CLI process.
-6. Codex reads the configured knowledge base and generates an answer.
+5. Text and image attachments are passed to the configured local CLI provider.
+6. The selected provider reads the configured knowledge base and generates an answer.
 7. The answer is sanitized and sent back through NapCatQQ.
 
 Main code locations:
@@ -60,7 +60,9 @@ Main code locations:
 - [src/index.js](./src/index.js)
 - [src/transport/onebot-transport.js](./src/transport/onebot-transport.js)
 - [src/engine/message-engine.js](./src/engine/message-engine.js)
+- [src/provider/index.js](./src/provider/index.js)
 - [src/provider/codex-runner.js](./src/provider/codex-runner.js)
+- [src/provider/gemini-runner.js](./src/provider/gemini-runner.js)
 - [src/session/file-session-store.js](./src/session/file-session-store.js)
 
 ### How to set the knowledge-base path
@@ -143,8 +145,11 @@ Example:
 
 ```env
 APP_MODE=onebot
+LLM_PROVIDER=codex
 
 CODEX_BIN=C:\Users\l1622\.version-fox\cache\nodejs\current\node.exe
+GEMINI_BIN=gemini
+GEMINI_MODEL=
 
 KNOWLEDGE_ROOT=D:\develop\SOURCE_CODE\easy-query
 KNOWLEDGE_LABEL=easy-query
@@ -175,8 +180,10 @@ Notes:
 - `KNOWLEDGE_PROJECTS` is a comma-separated list of the main projects inside the knowledge base, useful for setups like `easy-query`, `easy-query-doc`, `easy-query-plugin`, and `intellij-community`.
 - If `easy-query-doc` exists under `KNOWLEDGE_ROOT`, answers based on the docs should include the matching public chapter URL, for example `https://www.easy-query.com/easy-query-doc/func/datetime.html`.
 - When the question is about core `easy-query` behavior, the bridge will prioritize the main project and only pull in plugin or IntelliJ Platform sources when the question is clearly about IDEA integration or platform internals.
-- `CODEX_BIN` may be `codex` if your environment resolves it correctly.
-- On some Windows setups, using `node.exe` directly is more reliable than using a wrapper command.
+- `LLM_PROVIDER`: selects the CLI provider, currently `codex` or `gemini`
+- `CODEX_BIN`: executable entry when `LLM_PROVIDER=codex`
+- `GEMINI_BIN`: executable entry when `LLM_PROVIDER=gemini`
+- `GEMINI_MODEL`: optional Gemini CLI `--model` value
 - `ONEBOT_SELF_ID` may be left empty. The bridge will try to detect it through `get_login_info`.
 - Leave `QQ_TARGET_GROUPS` empty to allow all groups during early testing.
 
@@ -203,6 +210,8 @@ Expected startup logs:
 ```text
 CodeX-realQQ starting
 mode: onebot
+provider: codex
+provider label: Codex
 knowledge label: easy-query
 knowledge projects: easy-query, easy-query-doc, easy-query-plugin, intellij-community
 read-only qa: true
@@ -243,7 +252,7 @@ Image flow:
 
 1. NapCatQQ reports image segments through OneBot.
 2. The bridge materializes the images into `ATTACHMENT_DIR`.
-3. Local image paths are attached to Codex CLI through `-i`.
+3. Local image paths are attached through the current provider when supported; `codex` uses `-i`, and `gemini` uses `@relative/path` file references in the prompt.
 
 ## Privacy and Safety
 
