@@ -694,6 +694,8 @@ function hasMassMessagingSignals(text) {
 }
 
 function hasRepetitionSpam(text) {
+  if (looksLikeTechnicalLogOrStack(text)) return false;
+
   if (text.length >= 80) {
     const uniqueChars = new Set(text.replace(/\s+/g, '').split(''));
     if (uniqueChars.size > 0 && uniqueChars.size <= 6) return true;
@@ -706,4 +708,28 @@ function hasRepetitionSpam(text) {
   if (punctuationBurst.test(text)) return true;
 
   return false;
+}
+
+function looksLikeTechnicalLogOrStack(text) {
+  const value = String(text || '').trim().toLowerCase();
+  if (!value) return false;
+
+  const hints = [
+    '==> preparing:',
+    '==> parameters:',
+    'exception:',
+    'incorrect string value',
+    'stack trace',
+    ' at ',
+    'insert into ',
+    'update ',
+    'delete from ',
+    'select ',
+    'com.easy.query',
+    'java.sql.',
+    'org.springframework',
+    '.java:',
+  ];
+
+  return countIncludedHints(value, hints) >= 3;
 }
