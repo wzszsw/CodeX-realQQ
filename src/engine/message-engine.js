@@ -90,6 +90,8 @@ export class MessageEngine {
       return;
     }
 
+    process.stdout.write(`provider result: conversation=${message.conversationId} provider=${result.provider || this.config.provider} fallbackFrom=${result.fallbackFrom || '-'} ok=${result.ok}\n`);
+
     const rawAnswer = this.config.showReasoning && result.reasonings.length
       ? ['[Reasoning]', result.reasonings.join('\n\n'), '', '[Answer]', result.text].join('\n')
       : result.text || '已完成，但没有返回文本。';
