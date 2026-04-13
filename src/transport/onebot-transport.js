@@ -476,14 +476,28 @@ function mergeMessageWithQuoteContext(message) {
   if (!quote) return message;
 
   const quoteText = buildQuoteContextText(quote);
-  if (!quoteText) return message;
-
   const currentText = String(message.text || '').trim();
+  const mergedAttachments = mergeImageAttachments(
+    quote.attachments,
+    message.attachments,
+    Number.MAX_SAFE_INTEGER,
+  );
+
+  if (!quoteText) {
+    return mergedAttachments.length === (Array.isArray(message.attachments) ? message.attachments.length : 0)
+      ? message
+      : {
+          ...message,
+          attachments: mergedAttachments,
+        };
+  }
+
   return {
     ...message,
     text: currentText
       ? [quoteText, `本次提问：\n${currentText}`].join('\n\n')
       : [quoteText, '本次提问：\n请结合引用内容回答。'].join('\n\n'),
+    attachments: mergedAttachments,
   };
 }
 
