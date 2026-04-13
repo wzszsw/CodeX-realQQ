@@ -80,8 +80,14 @@ export class MessageEngine {
       process.stdout.write(`attachments received: total=${attachments.length}, images=${attachments.filter((item) => item?.kind === 'image').length}, downloaded=${imagePaths.length}\n`);
     }
     const promptText = text || buildAttachmentOnlyPrompt(attachments);
-    const result = await runProvider(this.config, session, promptText, { imagePaths });
+    const providerStartedAt = Date.now();
+    const progressLogger = createAiProgressLogger(this.config, message.conversationId, providerStartedAt);
+    const result = await runProvider(this.config, session, promptText, {
+      imagePaths,
+      onProgress: (event) => progressLogger(event),
+    });
     if (!result.ok) {
+      process.stdout.write(`provider result: conversation=${message.conversationId} provider=${result.provider || this.config.provider} fallbackFrom=${result.fallbackFrom || '-'} ok=${result.ok} elapsedMs=${Date.now() - providerStartedAt}\n`);
       await this.reply(message.conversationId, [
         `${getProviderLabel(result.provider || this.config)} 执行失败`,
         `error: ${result.error || '(unknown)'}`,
@@ -90,7 +96,7 @@ export class MessageEngine {
       return;
     }
 
-    process.stdout.write(`provider result: conversation=${message.conversationId} provider=${result.provider || this.config.provider} fallbackFrom=${result.fallbackFrom || '-'} ok=${result.ok}\n`);
+    process.stdout.write(`provider result: conversation=${message.conversationId} provider=${result.provider || this.config.provider} fallbackFrom=${result.fallbackFrom || '-'} ok=${result.ok} elapsedMs=${Date.now() - providerStartedAt}\n`);
 
     const rawAnswer = this.config.showReasoning && result.reasonings.length
       ? ['[Reasoning]', result.reasonings.join('\n\n'), '', '[Answer]', result.text].join('\n')
@@ -124,6 +130,55 @@ export class MessageEngine {
       }
     }
   }
+}
+
+function createAiProgressLogger(config, conversationId, startedAt) {
+  if (!config.aiProgressLogs) {
+    return () => {};
+  }
+
+  const minIntervalMs = Number(config.aiProgressIntervalMs) || 15000;
+  let lastStage = '';
+  let lastLoggedAt = 0;
+
+  return (event) => {
+    if (!event || typeof event !== 'object') return;
+
+    const provider = String(event.provider || config.provider || '').trim() || 'unknown';
+    const stage = String(event.stage || '').trim() || 'working';
+    const now = Date.now();
+    const shouldLog = stage !== lastStage || (now - lastLoggedAt) >= minIntervalMs || stage === 'completed' || stage === 'failed';
+    if (!shouldLog) return;
+
+    lastStage = stage;
+    lastLoggedAt = now;
+
+    const elapsedMs = Math.max(0, now - startedAt);
+    const segments = [
+      'ai progress:',
+      `conversation=${conversationId}`,
+      `provider=${provider}`,
+      `stage=${stage}`,
+      `elapsed=${formatElapsedMs(elapsedMs)}`,
+    ];
+
+    if (Number.isFinite(Number(event.reasoningCount)) && Number(event.reasoningCount) > 0) {
+      segments.push(`reasoning=${Number(event.reasoningCount)}`);
+    }
+    if (Number.isFinite(Number(event.messageCount)) && Number(event.messageCount) > 0) {
+      segments.push(`messages=${Number(event.messageCount)}`);
+    }
+    if (Number.isFinite(Number(event.heartbeatCount)) && Number(event.heartbeatCount) > 0) {
+      segments.push(`heartbeat=${Number(event.heartbeatCount)}`);
+    }
+
+    process.stdout.write(`${segments.join(' ')}\n`);
+  };
+}
+
+function formatElapsedMs(value) {
+  const seconds = Math.max(0, Math.round((Number(value) || 0) / 1000));
+  return `${seconds}s`;
 }
 
 function sanitizeReplyText(text, config, userText = '') {

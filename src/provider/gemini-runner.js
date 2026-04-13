@@ -5,6 +5,7 @@ import { buildProviderPrompt } from './prompt.js';
 
 export async function runGemini(config, session, userText, options = {}) {
   const imagePaths = Array.isArray(options.imagePaths) ? options.imagePaths : [];
+  const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
   const prompt = buildGeminiPrompt(config, userText, session, imagePaths);
   const args = ['--prompt', prompt, '--output-format', 'json'];
   for (const includeDir of buildGeminiIncludeDirs(config, imagePaths)) {
@@ -29,16 +30,48 @@ export async function runGemini(config, session, userText, options = {}) {
 
     let stdoutBuf = '';
     let stderrBuf = '';
+    let sawActivity = false;
+    let heartbeatCount = 0;
+    let lastActivityAt = Date.now();
+    const silenceMs = Number(config.aiProgressSilenceMs) || 10000;
+    const intervalMs = Math.max(Number(config.aiProgressIntervalMs) || 15000, silenceMs);
+
+    const emitProgress = (event) => {
+      if (!onProgress || !event || typeof event !== 'object') return;
+      onProgress(event);
+    };
+
+    emitProgress({ stage: 'started' });
+
+    const heartbeat = setInterval(() => {
+      heartbeatCount += 1;
+      const idleForMs = Date.now() - lastActivityAt;
+      emitProgress({
+        stage: sawActivity && idleForMs >= silenceMs ? 'waiting' : sawActivity ? 'thinking' : 'started',
+        heartbeatCount,
+      });
+    }, intervalMs);
+
+    const markActivity = () => {
+      lastActivityAt = Date.now();
+      if (sawActivity) return;
+      sawActivity = true;
+      emitProgress({ stage: 'thinking' });
+    };
 
     child.stdout.on('data', (chunk) => {
       stdoutBuf += chunk.toString('utf8');
+      markActivity();
     });
 
     child.stderr.on('data', (chunk) => {
       stderrBuf += chunk.toString('utf8');
+      markActivity();
     });
 
     child.on('error', (err) => {
+      clearInterval(heartbeat);
+      emitProgress({ stage: 'failed' });
       resolve({
         ok: false,
         error: err.message,
@@ -50,8 +83,10 @@ export async function runGemini(config, session, userText, options = {}) {
     });
 
     child.on('close', (exitCode, signal) => {
+      clearInterval(heartbeat);
       const parsed = parseGeminiOutput(stdoutBuf);
       const ok = exitCode === 0;
+      emitProgress({ stage: ok ? 'completed' : 'failed', heartbeatCount });
 
       resolve({
         ok,

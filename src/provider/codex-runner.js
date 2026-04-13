@@ -5,6 +5,7 @@ import { buildProviderPrompt } from './prompt.js';
 
 export async function runCodex(config, session, userText, options = {}) {
   const imagePaths = Array.isArray(options.imagePaths) ? options.imagePaths : [];
+  const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
   const prompt = buildProviderPrompt(config, userText, session, imagePaths);
   const args = [
     'exec',
@@ -32,6 +33,15 @@ export async function runCodex(config, session, userText, options = {}) {
     let lastAgentMessage = '';
     const reasonings = [];
     const logs = [];
+    let reasoningCount = 0;
+    let messageCount = 0;
+
+    const emitProgress = (event) => {
+      if (!onProgress || !event || typeof event !== 'object') return;
+      onProgress(event);
+    };
+
+    emitProgress({ stage: 'started' });
 
     const handleLine = (line, source) => {
       const trimmed = String(line || '').trim();
@@ -42,6 +52,7 @@ export async function runCodex(config, session, userText, options = {}) {
           const ev = JSON.parse(trimmed);
           if (ev.type === 'thread.started') {
             threadId = ev.thread_id || threadId;
+            emitProgress({ stage: 'started', threadId });
             return;
           }
           if (ev.type === 'item.completed') {
@@ -49,17 +60,24 @@ export async function runCodex(config, session, userText, options = {}) {
               const text = extractAgentMessageText(ev.item);
               if (text) {
                 lastAgentMessage = text;
+                messageCount += 1;
+                emitProgress({ stage: 'thinking', messageCount });
               }
               return;
             }
             if (ev.item?.type === 'reasoning') {
               const reasoning = extractReasoningText(ev.item);
-              if (reasoning) reasonings.push(reasoning);
+              if (reasoning) {
+                reasonings.push(reasoning);
+                reasoningCount += 1;
+                emitProgress({ stage: 'thinking', reasoningCount });
+              }
               return;
             }
           }
           if (ev.type === 'error') {
             logs.push(typeof ev.error === 'string' ? ev.error : JSON.stringify(ev.error));
+            emitProgress({ stage: 'failed' });
             return;
           }
           return;
@@ -87,6 +105,7 @@ export async function runCodex(config, session, userText, options = {}) {
     child.stderr.on('data', (chunk) => onData(chunk, 'stderr'));
 
     child.on('error', (err) => {
+      emitProgress({ stage: 'failed' });
       resolve({
         ok: false,
         error: err.message,
@@ -103,6 +122,7 @@ export async function runCodex(config, session, userText, options = {}) {
 
       const ok = exitCode === 0;
       const text = sanitizeFinalAnswer(lastAgentMessage);
+      emitProgress({ stage: ok ? 'completed' : 'failed', threadId, messageCount, reasoningCount });
 
       resolve({
         ok,

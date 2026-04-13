@@ -119,7 +119,7 @@ export class OneBotTransport {
 
     if (payload?.post_type !== 'message') return;
 
-    const message = mapOneBotMessage(payload, this.config, this.selfId, this);
+    const message = await mapOneBotMessage(payload, this.config, this.selfId, this);
     if (!message) return;
     if (message.chatType === 'group' && !message.deliverable) {
       this.storeRecentInboundContext(message);
@@ -133,7 +133,8 @@ export class OneBotTransport {
     const contextualizedMessage = recentContextMessages.length > 0
       ? mergeMessageWithRecentContext(message, recentContextMessages, this.config.maxImageAttachments)
       : message;
-    const mergedMessage = this.processInboundContext(contextualizedMessage);
+    const quotedMessage = mergeMessageWithQuoteContext(contextualizedMessage);
+    const mergedMessage = this.processInboundContext(quotedMessage);
     if (!mergedMessage) return;
     await this.dispatchInbound(mergedMessage);
   }
@@ -203,6 +204,19 @@ export class OneBotTransport {
     }
 
     return null;
+  }
+
+  async resolveQuotedMessage(messageId) {
+    const quotedId = stringifyId(messageId);
+    if (!quotedId) return null;
+
+    try {
+      const response = await this.callApi('get_msg', { message_id: quotedId });
+      return normalizeQuotedMessage(response?.data);
+    } catch (err) {
+      process.stderr.write(`onebot quote resolve failed: messageId=${quotedId} error=${err instanceof Error ? err.message : String(err)}\n`);
+      return null;
+    }
   }
 
   processInboundContext(message) {
@@ -351,10 +365,11 @@ export class OneBotTransport {
   }
 }
 
-function mapOneBotMessage(payload, config, selfId, transportRef) {
+async function mapOneBotMessage(payload, config, selfId, transportRef) {
   const messageType = String(payload.message_type || '').trim().toLowerCase();
   const rawText = extractOneBotText(payload.message);
   const attachments = extractAttachments(payload.message);
+  const quote = await extractQuote(payload.message, transportRef);
   const userId = stringifyId(payload.user_id);
 
   if (messageType === 'group') {
@@ -374,6 +389,7 @@ function mapOneBotMessage(payload, config, selfId, transportRef) {
       text: sanitizeGroupText(rawText, selfId),
       originalText: sanitizeGroupText(rawText, selfId),
       attachments,
+      quote,
       transportRef,
       mentioned,
       timestampMs: Number(payload.time || 0) * 1000 || Date.now(),
@@ -393,6 +409,7 @@ function mapOneBotMessage(payload, config, selfId, transportRef) {
       text: rawText,
       originalText: rawText,
       attachments,
+      quote,
       transportRef,
       mentioned: true,
       timestampMs: Number(payload.time || 0) * 1000 || Date.now(),
@@ -454,6 +471,22 @@ function mergeMessageWithRecentContext(message, contextMessages, maxImageAttachm
   };
 }
 
+function mergeMessageWithQuoteContext(message) {
+  const quote = message?.quote && typeof message.quote === 'object' ? message.quote : null;
+  if (!quote) return message;
+
+  const quoteText = buildQuoteContextText(quote);
+  if (!quoteText) return message;
+
+  const currentText = String(message.text || '').trim();
+  return {
+    ...message,
+    text: currentText
+      ? [quoteText, `本次提问：\n${currentText}`].join('\n\n')
+      : [quoteText, '本次提问：\n请结合引用内容回答。'].join('\n\n'),
+  };
+}
+
 function buildRecentContextText(contextMessages) {
   const lines = contextMessages
     .map((item, index) => formatContextLine(item, index + 1))
@@ -473,6 +506,36 @@ function formatContextLine(item, index) {
   if (parts.length === 0) return '';
 
   return `${index}. ${parts.join('，')}`;
+}
+
+async function extractQuote(message, transportRef) {
+  if (!Array.isArray(message)) return null;
+  const replySegment = message.find((segment) => segment?.type === 'reply');
+  const quotedMessageId = stringifyId(replySegment?.data?.id || replySegment?.data?.message_id || '');
+  if (!quotedMessageId) return null;
+  if (!transportRef || typeof transportRef.resolveQuotedMessage !== 'function') {
+    return { messageId: quotedMessageId };
+  }
+  const resolved = await transportRef.resolveQuotedMessage(quotedMessageId);
+  return resolved ? { messageId: quotedMessageId, ...resolved } : { messageId: quotedMessageId };
+}
+
+function buildQuoteContextText(quote) {
+  const messageId = stringifyId(quote?.messageId || quote?.id || '');
+  const senderName = String(quote?.senderName || '').trim();
+  const text = String(quote?.text || '').trim();
+  const imageCount = normalizeImageAttachments(quote?.attachments).length;
+  const parts = [];
+
+  if (senderName) parts.push(`发送者：${senderName}`);
+  if (text) parts.push(`内容：\n${text}`);
+  if (imageCount > 0) parts.push(`附件：${imageCount}张图片`);
+
+  if (parts.length === 0) {
+    return messageId ? `引用消息：message_id=${messageId}` : '';
+  }
+
+  return ['引用消息：', ...parts].join('\n');
 }
 
 function extractOneBotText(message) {
@@ -551,5 +614,16 @@ function normalizeResolvedFile(data) {
     file,
     url,
     fileName,
+  };
+}
+
+function normalizeQuotedMessage(data) {
+  if (!data || typeof data !== 'object') return null;
+  return {
+    senderId: stringifyId(data.user_id || data.sender?.user_id || ''),
+    senderName: String(data.sender?.card || data.sender?.nickname || '').trim(),
+    text: extractOneBotText(data.message),
+    attachments: extractAttachments(data.message),
+    timestampMs: Number(data.time || 0) * 1000 || 0,
   };
 }

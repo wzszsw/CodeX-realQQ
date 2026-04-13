@@ -12,6 +12,7 @@ export function createInboundMessage(input = {}) {
     text,
     originalText: typeof input.originalText === 'string' ? input.originalText : text,
     attachments: Array.isArray(input.attachments) ? input.attachments : [],
+    quote: input.quote && typeof input.quote === 'object' ? input.quote : null,
     transportRef: input.transportRef || null,
     mentioned: Boolean(input.mentioned),
     timestampMs: Number.isFinite(input.timestampMs) ? input.timestampMs : Date.now(),

@@ -6,9 +6,13 @@ const PROVIDERS = ['codex', 'gemini'];
 export async function runProvider(config, session, userText, options = {}) {
   const providerOrder = buildProviderOrder(config.provider);
   const failures = [];
+  const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
 
   for (const provider of providerOrder) {
-    const result = await runSingleProvider(provider, config, session, userText, options);
+    const result = await runSingleProvider(provider, config, session, userText, {
+      ...options,
+      onProgress: onProgress ? createProviderProgressEmitter(provider, onProgress) : null,
+    });
     if (result.ok) {
       return {
         ...result,
@@ -67,6 +71,16 @@ async function runSingleProvider(provider, config, session, userText, options) {
         threadId: null,
       };
   }
+}
+
+function createProviderProgressEmitter(provider, onProgress) {
+  return (event) => {
+    if (!event || typeof event !== 'object') return;
+    onProgress({
+      ...event,
+      provider,
+    });
+  };
 }
 
 function buildSuccessLogs(logs, failures) {
