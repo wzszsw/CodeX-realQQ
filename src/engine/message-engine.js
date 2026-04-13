@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { splitReplyText, stripReplyControlMarkers } from '../model.js';
-import { getProviderLabel, runProvider } from '../provider/index.js';
+import { runProvider } from '../provider/index.js';
 
 export class MessageEngine {
   constructor(config, transport, sessionStore) {
@@ -18,27 +18,27 @@ export class MessageEngine {
     process.stdout.write(`engine inbound: conversation=${message.conversationId} text=${JSON.stringify(text.slice(0, 80))} attachments=${attachments.length}\n`);
 
     if (isIdentityQuestion(originalText)) {
-      await this.reply(message.conversationId, buildIdentityReply(this.config.knowledgeLabel));
+      await this.sendAssistantReply(message.conversationId, buildIdentityReply(this.config.knowledgeLabel));
       return;
     }
 
     if (isSensitiveMetaQuestion(originalText)) {
-      await this.reply(message.conversationId, buildSensitiveMetaRefusal());
+      await this.sendAssistantReply(message.conversationId, buildSensitiveMetaRefusal());
       return;
     }
 
     if (isOutOfScopeQuestion(originalText)) {
-      await this.reply(message.conversationId, buildOutOfScopeRefusal(this.config.knowledgeLabel));
+      await this.sendAssistantReply(message.conversationId, buildOutOfScopeRefusal(this.config.knowledgeLabel));
       return;
     }
 
     if (isJunkOrAbusiveQuestion(originalText)) {
-      await this.reply(message.conversationId, buildJunkRefusal(this.config.knowledgeLabel));
+      await this.sendAssistantReply(message.conversationId, buildJunkRefusal(this.config.knowledgeLabel));
       return;
     }
 
     if (text === '/help') {
-      await this.reply(message.conversationId, [
+      await this.sendAssistantReply(message.conversationId, [
         '可用命令',
         '/help',
         '/status',
@@ -50,7 +50,7 @@ export class MessageEngine {
 
     if (text === '/status') {
       const session = this.sessionStore.getConversation(message.conversationId);
-      await this.reply(message.conversationId, [
+      await this.sendAssistantReply(message.conversationId, [
         '当前状态',
         `conversation: ${session.id}`,
         `history: ${session.history.length}`,
@@ -66,7 +66,7 @@ export class MessageEngine {
       session.history = [];
       session.updatedAt = new Date().toISOString();
       this.sessionStore.save();
-      await this.reply(message.conversationId, '已清空当前会话历史。');
+      await this.sendAssistantReply(message.conversationId, '已清空当前会话历史。');
       return;
     }
 
@@ -88,11 +88,7 @@ export class MessageEngine {
     });
     if (!result.ok) {
       process.stdout.write(`provider result: conversation=${message.conversationId} provider=${result.provider || this.config.provider} fallbackFrom=${result.fallbackFrom || '-'} ok=${result.ok} elapsedMs=${Date.now() - providerStartedAt}\n`);
-      await this.reply(message.conversationId, [
-        `${getProviderLabel(result.provider || this.config)} 执行失败`,
-        `error: ${result.error || '(unknown)'}`,
-        result.logs.length ? `logs: ${result.logs.join(' | ')}` : '',
-      ].filter(Boolean).join('\n'));
+      await this.sendAssistantReply(message.conversationId, buildProviderFailureReply());
       return;
     }
 
@@ -105,12 +101,16 @@ export class MessageEngine {
 
     if (!answer) {
       process.stderr.write(`reply blocked by safety filter: conversation=${message.conversationId} question=${JSON.stringify(originalText.slice(0, 120))}\n`);
-      await this.reply(message.conversationId, buildBlockedReply());
+      await this.sendAssistantReply(message.conversationId, buildBlockedReply());
       return;
     }
 
-    this.sessionStore.appendMessage(message.conversationId, 'assistant', stripReplyControlMarkers(answer));
-    await this.reply(message.conversationId, answer);
+    await this.sendAssistantReply(message.conversationId, answer);
+  }
+
+  async sendAssistantReply(conversationId, text) {
+    this.sessionStore.appendMessage(conversationId, 'assistant', stripReplyControlMarkers(text));
+    await this.reply(conversationId, text);
   }
 
   async reply(conversationId, text) {
@@ -420,6 +420,10 @@ function buildBlockedReply() {
     '这条回复已被安全策略拦截。',
     '请改问和当前知识库直接相关的代码、文档、配置或插件问题。',
   ].join('\n');
+}
+
+function buildProviderFailureReply() {
+  return '刚刚处理出错了，请稍后再试一次。';
 }
 
 function buildJunkRefusal(knowledgeLabel) {
