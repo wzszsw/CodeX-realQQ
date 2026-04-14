@@ -7,6 +7,18 @@ export async function runGemini(config, session, userText, options = {}) {
   const imagePaths = Array.isArray(options.imagePaths) ? options.imagePaths : [];
   const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
   const prompt = buildGeminiPrompt(config, userText, session, imagePaths);
+  const connectivityFailure = await probeGeminiConnectivity();
+  if (connectivityFailure) {
+    if (onProgress) onProgress({ stage: 'failed' });
+    return {
+      ok: false,
+      error: connectivityFailure,
+      text: '',
+      reasonings: [],
+      logs: buildLogs('', imagePaths, connectivityFailure),
+      threadId: null,
+    };
+  }
   const args = ['--prompt', prompt, '--output-format', 'json'];
   for (const includeDir of buildGeminiIncludeDirs(config, imagePaths)) {
     args.push('--include-directories', includeDir);
@@ -65,8 +77,12 @@ export async function runGemini(config, session, userText, options = {}) {
     });
 
     child.stderr.on('data', (chunk) => {
-      stderrBuf += chunk.toString('utf8');
+      const text = chunk.toString('utf8');
+      stderrBuf += text;
       markActivity();
+      if (looksLikeGeminiNetworkFailure(stderrBuf)) {
+        child.kill();
+      }
     });
 
     child.on('error', (err) => {
@@ -90,7 +106,7 @@ export async function runGemini(config, session, userText, options = {}) {
 
       resolve({
         ok,
-        error: ok ? '' : `exit=${exitCode}${signal ? ` signal=${signal}` : ''}`,
+        error: ok ? '' : describeGeminiFailure(exitCode, signal, stderrBuf),
         text: parsed.text,
         reasonings: parsed.reasonings,
         logs: buildLogs(stderrBuf, imagePaths, ...parsed.logs),
@@ -168,6 +184,41 @@ function resolveGeminiCommand(geminiBin, args) {
   }
 
   return { command, args };
+}
+
+async function probeGeminiConnectivity() {
+  try {
+    const response = await fetch('https://generativelanguage.googleapis.com/', {
+      method: 'HEAD',
+      signal: AbortSignal.timeout(5000),
+    });
+    if (response.status > 0) return '';
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
+  return '';
+}
+
+function looksLikeGeminiNetworkFailure(stderrBuf) {
+  const value = String(stderrBuf || '').toLowerCase();
+  if (!value) return false;
+  return [
+    'fetch failed sending request',
+    'error when talking to gemini api',
+    'exception typeerror: fetch failed',
+    'getaddrinfo',
+    'econnrefused',
+    'enotfound',
+    'etimedout',
+    'ehostunreach',
+  ].some((item) => value.includes(item));
+}
+
+function describeGeminiFailure(exitCode, signal, stderrBuf) {
+  if (looksLikeGeminiNetworkFailure(stderrBuf)) {
+    return 'gemini network unavailable';
+  }
+  return `exit=${exitCode}${signal ? ` signal=${signal}` : ''}`;
 }
 
 function parseGeminiOutput(raw) {
