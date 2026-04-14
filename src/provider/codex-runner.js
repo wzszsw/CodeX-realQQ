@@ -33,12 +33,20 @@ export async function runCodex(config, session, userText, options = {}) {
     let lastAgentMessage = '';
     const reasonings = [];
     const logs = [];
+    let quotaExhausted = false;
     let reasoningCount = 0;
     let messageCount = 0;
 
     const emitProgress = (event) => {
       if (!onProgress || !event || typeof event !== 'object') return;
       onProgress(event);
+    };
+
+    const trackProviderSignal = (value) => {
+      if (looksLikeQuotaExhausted(value)) {
+        quotaExhausted = true;
+        emitProgress({ stage: 'failed', reason: 'quota_exhausted' });
+      }
     };
 
     emitProgress({ stage: 'started' });
@@ -55,10 +63,22 @@ export async function runCodex(config, session, userText, options = {}) {
             emitProgress({ stage: 'started', threadId });
             return;
           }
+          if (ev.type === 'turn.failed') {
+            const errorText = typeof ev.error?.message === 'string'
+              ? ev.error.message
+              : typeof ev.message === 'string'
+                ? ev.message
+                : JSON.stringify(ev.error || ev);
+            trackProviderSignal(errorText);
+            logs.push(errorText);
+            emitProgress({ stage: 'failed', reason: quotaExhausted ? 'quota_exhausted' : '' });
+            return;
+          }
           if (ev.type === 'item.completed') {
             if (ev.item?.type === 'agent_message') {
               const text = extractAgentMessageText(ev.item);
               if (text) {
+                trackProviderSignal(text);
                 lastAgentMessage = text;
                 messageCount += 1;
                 emitProgress({ stage: 'thinking', messageCount });
@@ -68,6 +88,7 @@ export async function runCodex(config, session, userText, options = {}) {
             if (ev.item?.type === 'reasoning') {
               const reasoning = extractReasoningText(ev.item);
               if (reasoning) {
+                trackProviderSignal(reasoning);
                 reasonings.push(reasoning);
                 reasoningCount += 1;
                 emitProgress({ stage: 'thinking', reasoningCount });
@@ -76,7 +97,13 @@ export async function runCodex(config, session, userText, options = {}) {
             }
           }
           if (ev.type === 'error') {
-            logs.push(typeof ev.error === 'string' ? ev.error : JSON.stringify(ev.error));
+            const errorText = [
+              typeof ev.message === 'string' ? ev.message : '',
+              typeof ev.error === 'string' ? ev.error : '',
+              ev.error && typeof ev.error === 'object' && typeof ev.error.message === 'string' ? ev.error.message : '',
+            ].filter(Boolean).join(' | ') || JSON.stringify(ev.error || ev);
+            trackProviderSignal(errorText);
+            logs.push(errorText);
             emitProgress({ stage: 'failed' });
             return;
           }
@@ -87,6 +114,7 @@ export async function runCodex(config, session, userText, options = {}) {
       }
 
       if (source === 'stderr') {
+        trackProviderSignal(trimmed);
         logs.push(trimmed);
       }
     };
@@ -108,7 +136,7 @@ export async function runCodex(config, session, userText, options = {}) {
       emitProgress({ stage: 'failed' });
       resolve({
         ok: false,
-        error: err.message,
+        error: quotaExhausted ? 'quota_exhausted' : err.message,
         text: '',
         reasonings,
         logs: [...logs, err.message],
@@ -126,10 +154,10 @@ export async function runCodex(config, session, userText, options = {}) {
 
       resolve({
         ok,
-        error: ok ? '' : `exit=${exitCode}${signal ? ` signal=${signal}` : ''}`,
+        error: ok ? '' : quotaExhausted ? 'quota_exhausted' : `exit=${exitCode}${signal ? ` signal=${signal}` : ''}`,
         text,
         reasonings,
-        logs,
+        logs: quotaExhausted ? [...logs, 'quota_exhausted'] : logs,
         threadId,
       });
     });
@@ -230,5 +258,16 @@ function isProgressNarration(line) {
     /^next,? i /,
   ];
   return patterns.some((pattern) => pattern.test(value));
+}
+
+function looksLikeQuotaExhausted(value) {
+  const text = String(value || '').toLowerCase();
+  if (!text) return false;
+  return [
+    'user quota is not enough',
+    'quota is not enough',
+    'insufficient balance',
+    'balance is not enough',
+  ].some((item) => text.includes(item));
 }
 

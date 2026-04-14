@@ -1,43 +1,18 @@
 import { runCodex } from './codex-runner.js';
 import { runGemini } from './gemini-runner.js';
 
-const PROVIDERS = ['codex', 'gemini'];
-
 export async function runProvider(config, session, userText, options = {}) {
-  const providerOrder = buildProviderOrder(config.provider);
-  const failures = [];
+  const provider = normalizeProvider(config.provider);
   const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
-
-  for (const provider of providerOrder) {
-    const result = await runSingleProvider(provider, config, session, userText, {
-      ...options,
-      onProgress: onProgress ? createProviderProgressEmitter(provider, onProgress) : null,
-    });
-    if (result.ok) {
-      return {
-        ...result,
-        provider,
-        fallbackFrom: failures.length > 0 ? failures[0].provider : '',
-        logs: buildSuccessLogs(result.logs, failures),
-      };
-    }
-
-    failures.push({
-      provider,
-      error: result.error || 'unknown error',
-      logs: Array.isArray(result.logs) ? result.logs : [],
-    });
-  }
+  const result = await runSingleProvider(provider, config, session, userText, {
+    ...options,
+    onProgress: onProgress ? createProviderProgressEmitter(provider, onProgress) : null,
+  });
 
   return {
-    ok: false,
-    error: failures.map((failure) => `${getProviderLabel(failure.provider)}: ${failure.error}`).join(' | ') || 'all providers failed',
-    text: '',
-    reasonings: [],
-    logs: failures.flatMap(formatFailureLogs),
-    threadId: null,
-    provider: providerOrder[providerOrder.length - 1] || normalizeProvider(config.provider),
-    fallbackFrom: failures[0]?.provider || '',
+    ...result,
+    provider,
+    fallbackFrom: '',
   };
 }
 
@@ -47,12 +22,6 @@ export function getProviderLabel(configOrProvider) {
     : normalizeProvider(configOrProvider?.provider);
   if (provider === 'gemini') return 'Gemini';
   return 'Codex';
-}
-
-function buildProviderOrder(primaryProvider) {
-  const primary = normalizeProvider(primaryProvider);
-  if (!PROVIDERS.includes(primary)) return [primary];
-  return [primary, ...PROVIDERS.filter((provider) => provider !== primary)];
 }
 
 async function runSingleProvider(provider, config, session, userText, options) {
@@ -81,22 +50,6 @@ function createProviderProgressEmitter(provider, onProgress) {
       provider,
     });
   };
-}
-
-function buildSuccessLogs(logs, failures) {
-  const output = Array.isArray(logs) ? [...logs] : [];
-  if (failures.length === 0) return output;
-  return [
-    ...failures.flatMap(formatFailureLogs),
-    ...output,
-  ];
-}
-
-function formatFailureLogs(failure) {
-  return [
-    `${getProviderLabel(failure.provider)} failed: ${failure.error}`,
-    ...failure.logs.map((log) => `${getProviderLabel(failure.provider)} log: ${log}`),
-  ];
 }
 
 function normalizeProvider(value) {

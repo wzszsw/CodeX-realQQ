@@ -32,6 +32,13 @@ export function loadConfig() {
     aiProgressIntervalMs: parsePositiveInt(process.env.AI_PROGRESS_INTERVAL_MS, 15000),
     aiProgressSilenceMs: parsePositiveInt(process.env.AI_PROGRESS_SILENCE_MS, 10000),
     showReasoning: String(process.env.SHOW_REASONING || 'false').toLowerCase() === 'true',
+    recharge: {
+      username: String(process.env.N1N_USERNAME || '').trim(),
+      password: String(process.env.N1N_PASSWORD || '').trim(),
+      paymentMethod: String(process.env.N1N_PAYMENT_METHOD || 'wxpay').trim() || 'wxpay',
+      amount: 5,
+      timeoutMs: parsePositiveInt(process.env.N1N_TIMEOUT_MS, 30000),
+    },
     qq: {
       accountUin: String(process.env.QQ_ACCOUNT_UIN || '').trim(),
       targetGroups: parseCsv(process.env.QQ_TARGET_GROUPS || ''),

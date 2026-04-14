@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { splitReplyText, stripReplyControlMarkers } from '../model.js';
 import { runProvider } from '../provider/index.js';
+import { createRechargeLink } from '../recharge/n1n-runner.js';
 
 export class MessageEngine {
   constructor(config, transport, sessionStore) {
@@ -43,6 +44,7 @@ export class MessageEngine {
         '/help',
         '/status',
         '/reset',
+        '/充值',
         '直接发送普通问题即可交给 Codex 处理。',
       ].join('\n'));
       return;
@@ -70,6 +72,11 @@ export class MessageEngine {
       return;
     }
 
+    if (text === '/充值') {
+      await this.handleRechargeCommand(message.conversationId);
+      return;
+    }
+
     this.sessionStore.appendMessage(message.conversationId, 'user', text || buildAttachmentOnlyPrompt(attachments));
     const session = this.sessionStore.getConversation(message.conversationId);
 
@@ -81,13 +88,24 @@ export class MessageEngine {
     }
     const promptText = text || buildAttachmentOnlyPrompt(attachments);
     const providerStartedAt = Date.now();
+    let sawQuotaExhausted = false;
     const progressLogger = createAiProgressLogger(this.config, message.conversationId, providerStartedAt);
     const result = await runProvider(this.config, session, promptText, {
       imagePaths,
-      onProgress: (event) => progressLogger(event),
+      onProgress: (event) => {
+        if (String(event?.reason || '').trim().toLowerCase() === 'quota_exhausted') {
+          sawQuotaExhausted = true;
+        }
+        progressLogger(event);
+      },
     });
     if (!result.ok) {
       process.stdout.write(`provider result: conversation=${message.conversationId} provider=${result.provider || this.config.provider} fallbackFrom=${result.fallbackFrom || '-'} ok=${result.ok} elapsedMs=${Date.now() - providerStartedAt}\n`);
+      if (sawQuotaExhausted || looksLikeQuotaExhausted(result.error)) {
+        await this.sendAssistantReply(message.conversationId, buildQuotaExhaustedReply());
+        await this.handleRechargeCommand(message.conversationId);
+        return;
+      }
       await this.sendAssistantReply(message.conversationId, buildProviderFailureReply());
       return;
     }
@@ -111,6 +129,21 @@ export class MessageEngine {
   async sendAssistantReply(conversationId, text) {
     this.sessionStore.appendMessage(conversationId, 'assistant', stripReplyControlMarkers(text));
     await this.reply(conversationId, text);
+  }
+
+  async handleRechargeCommand(conversationId) {
+    process.stdout.write(`recharge start: conversation=${conversationId}\n`);
+    const recharge = await createRechargeLink(this.config);
+    if (!recharge.ok) {
+      process.stdout.write(`recharge failed: conversation=${conversationId} reason=${recharge.error || 'unknown'}\n`);
+      const failureReply = recharge.error === 'missing_config'
+        ? '充值暂时不可用，请联系管理员检查配置。'
+        : '充值下单失败，请稍后再试。';
+      await this.sendAssistantReply(conversationId, failureReply);
+      return;
+    }
+    process.stdout.write(`recharge success: conversation=${conversationId}\n`);
+    await this.sendAssistantReply(conversationId, `充值链接：${recharge.url}`);
   }
 
   async reply(conversationId, text) {
@@ -147,7 +180,7 @@ function createAiProgressLogger(config, conversationId, startedAt) {
     const provider = String(event.provider || config.provider || '').trim() || 'unknown';
     const stage = String(event.stage || '').trim() || 'working';
     const now = Date.now();
-    const shouldLog = stage !== lastStage || (now - lastLoggedAt) >= minIntervalMs || stage === 'completed' || stage === 'failed';
+    const shouldLog = stage !== lastStage || (now - lastLoggedAt) >= minIntervalMs || (stage === 'completed' && lastStage !== 'completed') || (stage === 'failed' && lastStage !== 'failed');
     if (!shouldLog) return;
 
     lastStage = stage;
@@ -424,6 +457,25 @@ function buildBlockedReply() {
 
 function buildProviderFailureReply() {
   return '刚刚处理出错了，请稍后再试一次。';
+}
+
+function buildQuotaExhaustedReply() {
+  return '当前余额不足，需要先充值。';
+}
+
+function looksLikeQuotaExhausted(...values) {
+  const joined = values
+    .flatMap((value) => Array.isArray(value) ? value : [value])
+    .map((value) => String(value || '').toLowerCase())
+    .join('\n');
+
+  if (!joined) return false;
+  return [
+    'user quota is not enough',
+    'quota is not enough',
+    'insufficient balance',
+    'balance is not enough',
+  ].some((item) => joined.includes(item));
 }
 
 function buildJunkRefusal(knowledgeLabel) {
