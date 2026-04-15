@@ -14,6 +14,7 @@ export class MessageEngine {
   async handleInbound(message) {
     const text = String(message.text || '').trim();
     const originalText = String(message.originalText || text).trim();
+    const commandText = extractCurrentCommandText(message, originalText);
     const attachments = Array.isArray(message.attachments) ? message.attachments : [];
     if (!text && attachments.length === 0) return;
     process.stdout.write(`engine inbound: conversation=${message.conversationId} text=${JSON.stringify(text.slice(0, 80))} attachments=${attachments.length}\n`);
@@ -38,7 +39,7 @@ export class MessageEngine {
       return;
     }
 
-    if (text === '/help') {
+    if (commandText === '/help') {
       await this.sendAssistantReply(message.conversationId, [
         '可用命令',
         '/help',
@@ -51,7 +52,7 @@ export class MessageEngine {
       return;
     }
 
-    if (text === '/status') {
+    if (commandText === '/status') {
       const session = this.sessionStore.getConversation(message.conversationId);
       await this.sendAssistantReply(message.conversationId, [
         '当前状态',
@@ -64,7 +65,7 @@ export class MessageEngine {
       return;
     }
 
-    if (text === '/reset') {
+    if (commandText === '/reset') {
       const session = this.sessionStore.getConversation(message.conversationId);
       session.history = [];
       session.updatedAt = new Date().toISOString();
@@ -73,12 +74,12 @@ export class MessageEngine {
       return;
     }
 
-    if (text === '/充值') {
+    if (commandText === '/充值') {
       await this.handleRechargeCommand(message.conversationId);
       return;
     }
 
-    if (text === '/余额') {
+    if (commandText === '/余额') {
       await this.handleBalanceCommand(message.conversationId);
       return;
     }
@@ -233,6 +234,22 @@ function createAiProgressLogger(config, conversationId, startedAt) {
 function formatElapsedMs(value) {
   const seconds = Math.max(0, Math.round((Number(value) || 0) / 1000));
   return `${seconds}s`;
+}
+
+function extractCurrentCommandText(message, fallbackText) {
+  const raw = String(message?.originalText || fallbackText || '').trim();
+  if (!raw) return '';
+
+  const lines = raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (const line of lines) {
+    if (line.startsWith('/')) return line;
+  }
+
+  return raw.startsWith('/') ? raw : '';
 }
 
 function sanitizeReplyText(text, config, userText = '') {
