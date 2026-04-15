@@ -27,6 +27,39 @@ export async function createRechargeLink(config) {
   }
 }
 
+export async function getBalanceInfo(config) {
+  const username = String(config?.recharge?.username || '').trim();
+  const password = String(config?.recharge?.password || '').trim();
+  const timeoutMs = Number(config?.recharge?.timeoutMs || 30000) || 30000;
+
+  if (!username || !password) {
+    return { ok: false, error: 'missing_config', quota: 0, usedQuota: 0, remainingQuota: 0 };
+  }
+
+  const signal = AbortSignal.timeout(timeoutMs);
+
+  try {
+    const session = await login({ username, password, signal });
+    const profile = await getSelfInfo({ ...session, signal });
+    const quota = Number(profile?.quota || 0) || 0;
+    return {
+      ok: true,
+      error: '',
+      balance: quotaToCurrency(quota),
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (signal.aborted || /timeout/i.test(message)) {
+      return { ok: false, error: 'timeout', quota: 0, usedQuota: 0, remainingQuota: 0 };
+    }
+    return { ok: false, error: message, quota: 0, usedQuota: 0, remainingQuota: 0 };
+  }
+}
+
+function quotaToCurrency(value) {
+  return Number((Number(value || 0) / 500000).toFixed(2));
+}
+
 function getCookieHeader(headers) {
   const setCookie = headers.getSetCookie ? headers.getSetCookie() : [];
   if (setCookie.length > 0) {
@@ -105,6 +138,22 @@ async function createPayOrder({ cookie, userId, paymentMethod, amount, signal })
       top_up_code: '',
       payment_method: paymentMethod,
     }),
+    signal,
+  });
+
+  return data.data;
+}
+
+async function getSelfInfo({ cookie, userId, signal }) {
+  const { data } = await requestJson(`${BASE_URL}/api/user/self`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json, text/plain, */*',
+      Cookie: cookie,
+      'New-Api-User': String(userId),
+      Origin: BASE_URL,
+      Referer: `${BASE_URL}/console`,
+    },
     signal,
   });
 

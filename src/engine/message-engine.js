@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { splitReplyText, stripReplyControlMarkers } from '../model.js';
 import { runProvider } from '../provider/index.js';
-import { createRechargeLink } from '../recharge/n1n-runner.js';
+import { createRechargeLink, getBalanceInfo } from '../recharge/n1n-runner.js';
 
 export class MessageEngine {
   constructor(config, transport, sessionStore) {
@@ -45,6 +45,7 @@ export class MessageEngine {
         '/status',
         '/reset',
         '/充值',
+        '/余额',
         '直接发送普通问题即可交给 Codex 处理。',
       ].join('\n'));
       return;
@@ -74,6 +75,11 @@ export class MessageEngine {
 
     if (text === '/充值') {
       await this.handleRechargeCommand(message.conversationId);
+      return;
+    }
+
+    if (text === '/余额') {
+      await this.handleBalanceCommand(message.conversationId);
       return;
     }
 
@@ -144,6 +150,21 @@ export class MessageEngine {
     }
     process.stdout.write(`recharge success: conversation=${conversationId}\n`);
     await this.sendAssistantReply(conversationId, `充值链接：${recharge.url}`);
+  }
+
+  async handleBalanceCommand(conversationId) {
+    process.stdout.write(`balance start: conversation=${conversationId}\n`);
+    const balance = await getBalanceInfo(this.config);
+    if (!balance.ok) {
+      process.stdout.write(`balance failed: conversation=${conversationId} reason=${balance.error || 'unknown'}\n`);
+      const failureReply = balance.error === 'missing_config'
+        ? '余额查询暂时不可用，请联系管理员检查配置。'
+        : '余额查询失败，请稍后再试。';
+      await this.sendAssistantReply(conversationId, failureReply);
+      return;
+    }
+    process.stdout.write(`balance success: conversation=${conversationId}\n`);
+    await this.sendAssistantReply(conversationId, `当前余额：${balance.balance.toFixed(2)} 元`);
   }
 
   async reply(conversationId, text) {
