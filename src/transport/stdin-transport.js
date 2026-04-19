@@ -1,5 +1,5 @@
 import readline from 'node:readline';
-import { createInboundMessage, createReplyPayload } from '../model.js';
+import { createInboundMessage, createReplyPayload, createStructuredReplyPayload } from '../model.js';
 
 export class StdinTransport {
   constructor() {
@@ -40,5 +40,15 @@ export class StdinTransport {
   async sendText(conversationId, text) {
     const payload = createReplyPayload({ conversationId, text });
     process.stdout.write(`\n[reply:${payload.conversationId}]\n${payload.text}\n\n`);
+  }
+
+  async sendMessage(conversationId, message) {
+    const payload = createStructuredReplyPayload({ conversationId, message });
+    const rendered = payload.message.map((segment) => {
+      if (segment?.type === 'text') return String(segment?.data?.text || '');
+      if (segment?.type === 'image') return `[image:${String(segment?.data?.file || '')}]`;
+      return `[segment:${String(segment?.type || 'unknown')}]`;
+    }).filter(Boolean).join('\n');
+    process.stdout.write(`\n[reply:${payload.conversationId}]\n${rendered}\n\n`);
   }
 }

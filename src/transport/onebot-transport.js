@@ -1,5 +1,5 @@
 import WebSocket from 'ws';
-import { createInboundMessage, createReplyPayload } from '../model.js';
+import { createInboundMessage, createReplyPayload, createStructuredReplyPayload } from '../model.js';
 
 export class OneBotTransport {
   constructor(config) {
@@ -23,23 +23,34 @@ export class OneBotTransport {
 
   async sendText(conversationId, text) {
     const payload = createReplyPayload({ conversationId, text });
-    const target = parseConversationId(payload.conversationId);
+    await this.sendStructuredMessage(payload.conversationId, [
+      { type: 'text', data: { text: payload.text } },
+    ]);
+  }
+
+  async sendMessage(conversationId, message) {
+    const payload = createStructuredReplyPayload({ conversationId, message });
+    await this.sendStructuredMessage(payload.conversationId, payload.message);
+  }
+
+  async sendStructuredMessage(conversationId, message) {
+    const target = parseConversationId(conversationId);
     if (!target) {
-      throw new Error(`unsupported conversation id: ${payload.conversationId}`);
+      throw new Error(`unsupported conversation id: ${conversationId}`);
     }
 
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       throw new Error('onebot websocket not connected');
     }
 
-    process.stdout.write(`onebot outbound: conversation=${payload.conversationId} chars=${payload.text.length}\n`);
+    process.stdout.write(`onebot outbound: conversation=${conversationId} segments=${Array.isArray(message) ? message.length : 0}\n`);
 
     if (this.config.onebot.replyMode === 'send_msg') {
       await this.callApi('send_msg', {
         message_type: target.chatType === 'group' ? 'group' : 'private',
         group_id: target.chatType === 'group' ? normalizeNumericId(target.targetId) : undefined,
         user_id: target.chatType === 'private' ? normalizeNumericId(target.targetId) : undefined,
-        message: payload.text,
+        message,
       });
       return;
     }
@@ -47,14 +58,14 @@ export class OneBotTransport {
     if (target.chatType === 'group') {
       await this.callApi('send_group_msg', {
         group_id: normalizeNumericId(target.targetId),
-        message: payload.text,
+        message,
       });
       return;
     }
 
     await this.callApi('send_private_msg', {
       user_id: normalizeNumericId(target.targetId),
-      message: payload.text,
+      message,
     });
   }
 

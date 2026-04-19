@@ -26,6 +26,13 @@ export function createReplyPayload(input = {}) {
   };
 }
 
+export function createStructuredReplyPayload(input = {}) {
+  return {
+    conversationId: String(input.conversationId || '').trim(),
+    message: Array.isArray(input.message) ? input.message : [],
+  };
+}
+
 export function splitReplyText(text, limit = 1500, options = {}) {
   const value = normalizeReplyTextForQQ(text);
   const softLimit = Math.min(limit, 220);

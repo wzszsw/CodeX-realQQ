@@ -138,6 +138,22 @@ export class MessageEngine {
     await this.reply(conversationId, text);
   }
 
+  async sendAssistantImageReply(conversationId, text, filePath) {
+    if (text) {
+      this.sessionStore.appendMessage(conversationId, 'assistant', stripReplyControlMarkers(text));
+    }
+    if (typeof this.transport.sendMessage === 'function') {
+      const segments = [];
+      if (text) {
+        segments.push({ type: 'text', data: { text } });
+      }
+      segments.push({ type: 'image', data: { file: toOneBotFileRef(filePath) } });
+      await this.transport.sendMessage(conversationId, segments);
+      return;
+    }
+    await this.sendAssistantReply(conversationId, text || `图片文件：${filePath}`);
+  }
+
   async handleRechargeCommand(conversationId) {
     process.stdout.write(`recharge start: conversation=${conversationId}\n`);
     const recharge = await createRechargeLink(this.config);
@@ -149,7 +165,21 @@ export class MessageEngine {
       await this.sendAssistantReply(conversationId, failureReply);
       return;
     }
-    process.stdout.write(`recharge success: conversation=${conversationId}\n`);
+    process.stdout.write(`recharge success: conversation=${conversationId} paymentMethod=${recharge.paymentMethod || '-'} image=${recharge.imagePath ? 'yes' : 'no'}\n`);
+    if (recharge.paymentMethod === 'alipay') {
+      if (!recharge.imagePath) {
+        await this.sendAssistantReply(conversationId, '支付宝充值二维码生成失败，请稍后再试。');
+        return;
+      }
+      try {
+        await this.sendAssistantImageReply(conversationId, '支付宝充值二维码如下。', recharge.imagePath);
+        return;
+      } catch (err) {
+        process.stderr.write(`recharge image reply failed: conversation=${conversationId} error=${err instanceof Error ? err.message : String(err)}\n`);
+        await this.sendAssistantReply(conversationId, '支付宝充值二维码发送失败，请稍后再试。');
+        return;
+      }
+    }
     await this.sendAssistantReply(conversationId, `充值链接：${recharge.url}`);
   }
 
@@ -250,6 +280,10 @@ function extractCurrentCommandText(message, fallbackText) {
   }
 
   return raw.startsWith('/') ? raw : '';
+}
+
+function toOneBotFileRef(filePath) {
+  return `file:///${String(filePath || '').replace(/\\/g, '/')}`;
 }
 
 function sanitizeReplyText(text, config, userText = '') {
