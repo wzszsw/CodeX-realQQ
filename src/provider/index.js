@@ -1,5 +1,6 @@
 import { runCodex } from './codex-runner.js';
 import { runGemini } from './gemini-runner.js';
+import { runClaude } from './claude-runner.js';
 
 export async function runProvider(config, session, userText, options = {}) {
   const provider = normalizeProvider(config.provider);
@@ -21,6 +22,7 @@ export function getProviderLabel(configOrProvider) {
     ? normalizeProvider(configOrProvider)
     : normalizeProvider(configOrProvider?.provider);
   if (provider === 'gemini') return 'Gemini';
+  if (provider === 'claude') return 'Claude Code';
   return 'Codex';
 }
 
@@ -30,6 +32,8 @@ async function runSingleProvider(provider, config, session, userText, options) {
       return runCodex(config, session, userText, options);
     case 'gemini':
       return runGemini(config, session, userText, options);
+    case 'claude':
+      return runClaude(config, session, userText, options);
     default:
       return {
         ok: false,

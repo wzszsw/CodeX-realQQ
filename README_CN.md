@@ -5,7 +5,7 @@
 - 官方 QQ NT
 - NapCatQQ
 - OneBot 11 WebSocket
-- 本机 Codex CLI / Gemini CLI
+- 本机 Codex CLI / Gemini CLI / Claude Code CLI
 - 只读知识库问答层
 
 它适合做这些事情：
@@ -63,6 +63,7 @@
 - [src/provider/index.js](./src/provider/index.js)
 - [src/provider/codex-runner.js](./src/provider/codex-runner.js)
 - [src/provider/gemini-runner.js](./src/provider/gemini-runner.js)
+- [src/provider/claude-runner.js](./src/provider/claude-runner.js)
 - [src/session/file-session-store.js](./src/session/file-session-store.js)
 
 ### 如何指定知识库位置
@@ -145,7 +146,7 @@ Copy-Item .env.napcat.example .env
 
 ```env
 APP_MODE=onebot
-LLM_PROVIDER=codex
+LLM_PROVIDER=claude
 
 CODEX_BIN=C:\Users\l1622\.version-fox\cache\nodejs\current\node.exe
 GEMINI_BIN=gemini
@@ -179,7 +180,8 @@ QQ_POLL_INTERVAL_MS=1500
 - `KNOWLEDGE_LABEL` 是对外展示的知识库名字，用来替代本地真实路径。
 - `KNOWLEDGE_PROJECTS` 用逗号列出知识库中的重点项目，适合 `easy-query`、`easy-query-plugin`、`intellij-community` 这类多项目场景。
 - 当问题是 `easy-query` 本体功能时，系统会优先基于主项目回答；只有明显涉及 IDEA 插件或 IntelliJ 平台时，才补充读取插件和平台源码。
-- `LLM_PROVIDER`：选择优先使用的 CLI provider，当前支持 `codex` 和 `gemini`；如果优先 provider 执行失败，会自动尝试另一个
+- `LLM_PROVIDER`：选择 CLI provider，当前支持 `claude`、`codex`、`gemini`；默认值改为 `claude`
+- `CLAUDE_BIN`：如果选择 `claude`，这里填 Claude Code CLI 可执行入口
 - `CODEX_BIN`：如果选择 `codex`，这里填 Codex 可执行入口
 - `GEMINI_BIN`：如果选择 `gemini`，这里填 Gemini CLI 可执行入口
 - `GEMINI_MODEL`：可选，指定 Gemini CLI 的 `--model`
@@ -250,7 +252,7 @@ onebot self id: 3772046889
 
 1. NapCatQQ 通过 OneBot 上报图片消息段
 2. 桥接程序把图片落到 `ATTACHMENT_DIR`
-3. 再通过当前 provider 支持的方式把图片传给底层 CLI；当前 `codex` 使用 `-i`，`gemini` 使用 prompt 中的 `@路径` 文件引用，并通过 `--include-directories` 允许读取临时附件目录
+3. 再通过当前 provider 支持的方式把图片传给底层 CLI；当前 `codex` 使用 `-i`，`gemini` 使用 prompt 中的 `@路径` 文件引用，并通过 `--include-directories` 允许读取临时附件目录，`claude` 则通过 prompt 中的本地图片路径提示并配合 `--add-dir` 授权读取。
 
 ## 隐私与安全
 

@@ -10,9 +10,10 @@ export function loadConfig() {
   return {
     rootDir: ROOT,
     appMode: String(process.env.APP_MODE || 'stdin').trim().toLowerCase(),
-    provider: String(process.env.LLM_PROVIDER || 'codex').trim().toLowerCase() || 'codex',
+    provider: String(process.env.LLM_PROVIDER || 'claude').trim().toLowerCase() || 'claude',
     codexBin: String(process.env.CODEX_BIN || 'codex').trim() || 'codex',
     geminiBin: String(process.env.GEMINI_BIN || 'gemini').trim() || 'gemini',
+    claudeBin: String(process.env.CLAUDE_BIN || 'claude').trim() || 'claude',
     geminiModel: String(process.env.GEMINI_MODEL || '').trim(),
     knowledgeRoot: resolveLocalPath(process.env.KNOWLEDGE_ROOT || '.'),
     knowledgeLabel: String(process.env.KNOWLEDGE_LABEL || 'knowledge-base').trim() || 'knowledge-base',

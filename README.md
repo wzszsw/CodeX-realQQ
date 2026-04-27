@@ -5,7 +5,7 @@
 - official QQ NT
 - NapCatQQ
 - OneBot 11 WebSocket
-- local Codex CLI or Gemini CLI
+- local Codex CLI, Gemini CLI, or Claude Code CLI
 - a read-only knowledge-base Q&A layer
 
 It is intended for scenarios such as:
@@ -63,6 +63,7 @@ Main code locations:
 - [src/provider/index.js](./src/provider/index.js)
 - [src/provider/codex-runner.js](./src/provider/codex-runner.js)
 - [src/provider/gemini-runner.js](./src/provider/gemini-runner.js)
+- [src/provider/claude-runner.js](./src/provider/claude-runner.js)
 - [src/session/file-session-store.js](./src/session/file-session-store.js)
 
 ### How to set the knowledge-base path
@@ -145,7 +146,7 @@ Example:
 
 ```env
 APP_MODE=onebot
-LLM_PROVIDER=codex
+LLM_PROVIDER=claude
 
 CODEX_BIN=C:\Users\l1622\.version-fox\cache\nodejs\current\node.exe
 GEMINI_BIN=gemini
@@ -180,7 +181,8 @@ Notes:
 - `KNOWLEDGE_PROJECTS` is a comma-separated list of the main projects inside the knowledge base, useful for setups like `easy-query`, `easy-query-doc`, `easy-query-plugin`, and `intellij-community`.
 - If `easy-query-doc` exists under `KNOWLEDGE_ROOT`, answers based on the docs should include the matching public chapter URL, for example `https://www.easy-query.com/easy-query-doc/func/datetime.html`.
 - When the question is about core `easy-query` behavior, the bridge will prioritize the main project and only pull in plugin or IntelliJ Platform sources when the question is clearly about IDEA integration or platform internals.
-- `LLM_PROVIDER`: selects the preferred CLI provider, currently `codex` or `gemini`; if the preferred provider fails, the bridge automatically tries the other one
+- `LLM_PROVIDER`: selects the CLI provider, currently `claude`, `codex`, or `gemini`; the default is `claude`
+- `CLAUDE_BIN`: executable entry when `LLM_PROVIDER=claude`
 - `CODEX_BIN`: executable entry when `LLM_PROVIDER=codex`
 - `GEMINI_BIN`: executable entry when `LLM_PROVIDER=gemini`
 - `GEMINI_MODEL`: optional Gemini CLI `--model` value
@@ -252,7 +254,7 @@ Image flow:
 
 1. NapCatQQ reports image segments through OneBot.
 2. The bridge materializes the images into `ATTACHMENT_DIR`.
-3. Local image paths are attached through the current provider when supported; `codex` uses `-i`, and `gemini` uses `@path` file references plus `--include-directories` for temporary attachment directories.
+3. Local image paths are attached through the current provider when supported; `codex` uses `-i`, `gemini` uses `@path` file references plus `--include-directories` for temporary attachment directories, and `claude` is given local image paths through the prompt plus `--add-dir` access.
 
 ## Privacy and Safety
 
