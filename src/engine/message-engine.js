@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { splitReplyText, stripReplyControlMarkers } from '../model.js';
 import { runProvider } from '../provider/index.js';
-import { createRechargeLink, getBalanceInfo } from '../recharge/n1n-runner.js';
+import { createRecharge, getBalance } from '../billing/index.js';
 
 export class MessageEngine {
   constructor(config, transport, sessionStore) {
@@ -156,7 +156,7 @@ export class MessageEngine {
 
   async handleRechargeCommand(conversationId) {
     process.stdout.write(`recharge start: conversation=${conversationId}\n`);
-    const recharge = await createRechargeLink(this.config);
+    const recharge = await createRecharge(this.config);
     if (!recharge.ok) {
       process.stdout.write(`recharge failed: conversation=${conversationId} reason=${recharge.error || 'unknown'}\n`);
       const failureReply = recharge.error === 'missing_config'
@@ -165,14 +165,14 @@ export class MessageEngine {
       await this.sendAssistantReply(conversationId, failureReply);
       return;
     }
-    process.stdout.write(`recharge success: conversation=${conversationId} paymentMethod=${recharge.paymentMethod || '-'} image=${recharge.imagePath ? 'yes' : 'no'}\n`);
-    if (recharge.paymentMethod === 'alipay') {
+    process.stdout.write(`recharge success: conversation=${conversationId} provider=${recharge.provider || '-'} presentation=${recharge.presentation || '-'} image=${recharge.imagePath ? 'yes' : 'no'}\n`);
+    if (recharge.presentation === 'image') {
       if (!recharge.imagePath) {
         await this.sendAssistantReply(conversationId, '支付宝充值二维码生成失败，请稍后再试。');
         return;
       }
       try {
-        await this.sendAssistantImageReply(conversationId, '支付宝充值二维码如下。', recharge.imagePath);
+        await this.sendAssistantImageReply(conversationId, recharge.text || '支付宝充值二维码如下。', recharge.imagePath);
         return;
       } catch (err) {
         process.stderr.write(`recharge image reply failed: conversation=${conversationId} error=${err instanceof Error ? err.message : String(err)}\n`);
@@ -185,7 +185,7 @@ export class MessageEngine {
 
   async handleBalanceCommand(conversationId) {
     process.stdout.write(`balance start: conversation=${conversationId}\n`);
-    const balance = await getBalanceInfo(this.config);
+    const balance = await getBalance(this.config);
     if (!balance.ok) {
       process.stdout.write(`balance failed: conversation=${conversationId} reason=${balance.error || 'unknown'}\n`);
       const failureReply = balance.error === 'missing_config'
