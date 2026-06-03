@@ -211,16 +211,86 @@ function extractReasoningText(item) {
 
 function resolveCodexCommand(codexBin, args) {
   const command = String(codexBin || '').trim() || 'codex';
-  if (process.platform === 'win32') {
-    const lower = command.toLowerCase();
-    if (lower.endsWith('node.exe')) {
-      const codexScript = path.join(path.dirname(command), 'node_modules', '@openai', 'codex', 'bin', 'codex.js');
-      if (fs.existsSync(codexScript)) {
-        return { command, args: [codexScript, ...args] };
+  if (process.platform !== 'win32') {
+    return { command, args };
+  }
+
+  const directResolution = resolveCodexNodeWrapper(command, args);
+  if (directResolution) return directResolution;
+
+  const resolvedCommandPath = resolveWindowsCommandPath(command);
+  const pathResolution = resolvedCommandPath ? resolveCodexNodeWrapper(resolvedCommandPath, args) : null;
+  if (pathResolution) return pathResolution;
+
+  return { command, args };
+}
+
+function resolveCodexNodeWrapper(command, args) {
+  const raw = stripWrappingQuotes(command);
+  if (!raw) return null;
+
+  const lower = raw.replace(/\\/g, '/').toLowerCase();
+  if (lower.endsWith('/node.exe') || lower.endsWith('node.exe')) {
+    const codexScript = path.join(path.dirname(raw), 'node_modules', '@openai', 'codex', 'bin', 'codex.js');
+    if (fs.existsSync(codexScript)) {
+      return { command: raw, args: [codexScript, ...args] };
+    }
+    return null;
+  }
+
+  const siblingNode = path.join(path.dirname(raw), 'node.exe');
+  const codexScript = path.join(path.dirname(raw), 'node_modules', '@openai', 'codex', 'bin', 'codex.js');
+  if (fs.existsSync(siblingNode) && fs.existsSync(codexScript)) {
+    return { command: siblingNode, args: [codexScript, ...args] };
+  }
+
+  return null;
+}
+
+function resolveWindowsCommandPath(command) {
+  const raw = stripWrappingQuotes(command);
+  if (!raw) return '';
+
+  const hasPathSeparator = raw.includes('/') || raw.includes('\\');
+  const pathEntries = hasPathSeparator || path.isAbsolute(raw)
+    ? ['']
+    : String(process.env.PATH || '')
+      .split(path.delimiter)
+      .map((entry) => stripWrappingQuotes(entry))
+      .filter(Boolean);
+
+  for (const entry of pathEntries) {
+    const basePath = entry ? path.join(entry, raw) : raw;
+    for (const candidate of buildWindowsCommandCandidates(basePath)) {
+      if (fs.existsSync(candidate)) {
+        return candidate;
       }
     }
   }
-  return { command, args };
+
+  return '';
+}
+
+function buildWindowsCommandCandidates(basePath) {
+  const normalizedBasePath = stripWrappingQuotes(basePath);
+  if (!normalizedBasePath) return [];
+  if (path.extname(normalizedBasePath)) {
+    return [normalizedBasePath];
+  }
+
+  const pathExts = String(process.env.PATHEXT || '.COM;.EXE;.BAT;.CMD;.PS1')
+    .split(';')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+
+  return [
+    normalizedBasePath,
+    ...pathExts.map((ext) => `${normalizedBasePath}${ext}`),
+  ];
+}
+
+function stripWrappingQuotes(value) {
+  return String(value || '').trim().replace(/^"(.*)"$/, '$1');
 }
 
 function sanitizeFinalAnswer(text) {

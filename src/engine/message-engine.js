@@ -107,7 +107,7 @@ export class MessageEngine {
       },
     });
     if (!result.ok) {
-      process.stdout.write(`provider result: conversation=${message.conversationId} provider=${result.provider || this.config.provider} fallbackFrom=${result.fallbackFrom || '-'} ok=${result.ok} elapsedMs=${Date.now() - providerStartedAt}\n`);
+      process.stdout.write(`provider result: conversation=${message.conversationId} provider=${result.provider || this.config.provider} fallbackFrom=${result.fallbackFrom || '-'} ok=${result.ok} elapsedMs=${Date.now() - providerStartedAt} error=${JSON.stringify(String(result.error || ''))}\n`);
       if (sawQuotaExhausted || looksLikeQuotaExhausted(result.error)) {
         await this.sendAssistantReply(message.conversationId, buildQuotaExhaustedReply());
         await this.handleRechargeCommand(message.conversationId);

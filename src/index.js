@@ -10,6 +10,7 @@ import { getProviderLabel } from './provider/index.js';
 const config = loadConfig();
 
 fs.mkdirSync(path.dirname(config.sessionStoreFile), { recursive: true });
+validateConfig(config);
 
 const transport = createTransport(config);
 const sessionStore = new FileSessionStore(config.sessionStoreFile);
@@ -49,4 +50,20 @@ function createTransport(config) {
     return new OneBotTransport(config);
   }
   throw new Error(`unsupported APP_MODE: ${config.appMode}`);
+}
+
+function validateConfig(config) {
+  const knowledgeRoot = String(config.knowledgeRoot || '').trim();
+  if (!knowledgeRoot) {
+    throw new Error('KNOWLEDGE_ROOT is empty');
+  }
+
+  if (!fs.existsSync(knowledgeRoot)) {
+    throw new Error(`KNOWLEDGE_ROOT does not exist: ${knowledgeRoot}`);
+  }
+
+  const stat = fs.statSync(knowledgeRoot);
+  if (!stat.isDirectory()) {
+    throw new Error(`KNOWLEDGE_ROOT is not a directory: ${knowledgeRoot}`);
+  }
 }
