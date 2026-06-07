@@ -10,6 +10,7 @@ export function buildProviderPrompt(config, userText, session, imagePaths = []) 
     .join('\n');
   const projectScope = formatKnowledgeProjectScope(config.knowledgeProjects);
   const easyQueryDocRules = buildEasyQueryDocRules(config);
+  const easyQuerySelectAutoIncludeRules = buildEasyQuerySelectAutoIncludeRules(config);
   const attachedImageLine = formatAttachedImageLine(imagePaths);
 
   const instructions = [
@@ -51,6 +52,8 @@ export function buildProviderPrompt(config, userText, session, imagePaths = []) 
     easyQueryDocRules ? 'When the question is about usage, configuration, built-in functions, examples, or chapterized docs, prefer easy-query-doc when it directly answers the question.' : '',
     easyQueryDocRules ? 'If you rely on easy-query-doc content, include the matching public chapter URL in the answer and do not output only the local markdown path.' : '',
     easyQueryDocRules || '',
+    easyQuerySelectAutoIncludeRules ? 'For easy-query API advice, prefer the documented default recommendation directly instead of presenting all options as equally preferred.' : '',
+    easyQuerySelectAutoIncludeRules || '',
     `If you need to refer to the knowledge base, call it "${config.knowledgeLabel}".`,
     `If the user asks who you are, say "我是 ${config.knowledgeLabel} 的问答助手。" and then briefly list the kinds of questions you can answer, such as concepts, API usage, query/update/delete behavior, annotations, configuration, and strategy extensions.`,
     'Keep the answer concise and user-focused. Default to a short answer unless the user clearly asks for depth.',
@@ -90,7 +93,24 @@ function buildEasyQueryDocRules(config) {
     '2. easy-query-doc/src/<dir>/README.md or readme.md -> https://www.easy-query.com/easy-query-doc/<dir>/',
     '3. easy-query-doc/src/README.md -> https://www.easy-query.com/easy-query-doc/',
     '4. Example: easy-query-doc/src/func/datetime.md -> https://www.easy-query.com/easy-query-doc/func/datetime.html',
-    '5. If multiple chapters are central, include the 1 to 3 most relevant URLs only.',
+    '5. Example: easy-query-doc/src/dto-query/map2.md -> https://www.easy-query.com/easy-query-doc/dto-query/map2.html',
+    '6. Example: easy-query-doc/src/dto-query/map3.md -> https://www.easy-query.com/easy-query-doc/dto-query/map3.html',
+    '7. If multiple chapters are central, include the 1 to 3 most relevant URLs only.',
+  ].join('\n');
+}
+
+function buildEasyQuerySelectAutoIncludeRules(config) {
+  if (!hasEasyQueryDoc(config)) return '';
+  return [
+    'easy-query selectAutoInclude answer rules:',
+    '1. Treat selectAutoInclude as a DTO projection capability. Prefer DTO classes, not entity or table classes.',
+    '2. If the user asks about structured DTO return, nested list conditions, arbitrary-level filtering, current-node sorting, topN, aggregation, or extra fields, recommend EXTRA_AUTO_INCLUDE_CONFIGURE first.',
+    '3. Recommend selectAutoInclude(Class<DTO>, expression) only as a simpler secondary option for one-off root-table extra selection or explicit join assignment. Do not present it as the first recommendation for multi-level control.',
+    '4. When recommending EXTRA_AUTO_INCLUDE_CONFIGURE, explain that it is defined on the DTO node as `private static final ExtraAutoIncludeConfigure EXTRA_AUTO_INCLUDE_CONFIGURE = XxxProxy.TABLE.EXTRA_AUTO_INCLUDE_CONFIGURE()` and is suited for `.where(...)`, `.select(...)`, and `.configure(...)`.',
+    '5. If the question is about any-level expression control of selectAutoInclude, mention that easy-query-doc recommends eq 3.1.60+ for this capability.',
+    '6. If manual include(...) is mixed with selectAutoInclude, mention that manual include overrides selectAutoInclude on that path.',
+    '7. If the user asks whether selectAutoInclude should receive an entity class, answer no by default and explain that the docs warn it can pull the whole relationship tree.',
+    '8. For these topics, prefer dto-query/map2 and dto-query/map3 over generic summaries, and include the public chapter URL when useful.',
   ].join('\n');
 }
 
