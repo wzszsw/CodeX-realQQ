@@ -19,13 +19,15 @@ export async function runCodex(config, session, userText, options = {}) {
   args.push('-C', config.knowledgeRoot, prompt);
 
   const spawnCommand = resolveCodexCommand(config.codexBin, args);
+  const spawnEnv = buildCodexEnv(process.env, spawnCommand);
 
   return await new Promise((resolve) => {
     const child = spawn(spawnCommand.command, spawnCommand.args, {
       cwd: config.knowledgeRoot,
-      env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      env: spawnEnv,
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
+    child.stdin.end();
 
     let stdoutBuf = '';
     let stderrBuf = '';
@@ -36,10 +38,20 @@ export async function runCodex(config, session, userText, options = {}) {
     let quotaExhausted = false;
     let reasoningCount = 0;
     let messageCount = 0;
+    let settled = false;
 
     const emitProgress = (event) => {
       if (!onProgress || !event || typeof event !== 'object') return;
       onProgress(event);
+    };
+
+    const finalize = (payload, terminateChild = false) => {
+      if (settled) return;
+      settled = true;
+      resolve(payload);
+      if (terminateChild) {
+        terminateSpawnedProcess(child);
+      }
     };
 
     const trackProviderSignal = (value) => {
@@ -72,6 +84,27 @@ export async function runCodex(config, session, userText, options = {}) {
             trackProviderSignal(errorText);
             logs.push(errorText);
             emitProgress({ stage: 'failed', reason: quotaExhausted ? 'quota_exhausted' : '' });
+            finalize({
+              ok: false,
+              error: quotaExhausted ? 'quota_exhausted' : errorText,
+              text: '',
+              reasonings,
+              logs: quotaExhausted ? [...logs, 'quota_exhausted'] : logs,
+              threadId,
+            }, true);
+            return;
+          }
+          if (ev.type === 'turn.completed') {
+            const text = sanitizeFinalAnswer(lastAgentMessage);
+            emitProgress({ stage: 'completed', threadId, messageCount, reasoningCount });
+            finalize({
+              ok: true,
+              error: '',
+              text,
+              reasonings,
+              logs,
+              threadId,
+            }, true);
             return;
           }
           if (ev.type === 'item.completed') {
@@ -134,7 +167,7 @@ export async function runCodex(config, session, userText, options = {}) {
 
     child.on('error', (err) => {
       emitProgress({ stage: 'failed' });
-      resolve({
+      finalize({
         ok: false,
         error: quotaExhausted ? 'quota_exhausted' : err.message,
         text: '',
@@ -145,14 +178,16 @@ export async function runCodex(config, session, userText, options = {}) {
     });
 
     child.on('close', (exitCode, signal) => {
+      if (settled) return;
       if (stdoutBuf.trim()) handleLine(stdoutBuf, 'stdout');
       if (stderrBuf.trim()) handleLine(stderrBuf, 'stderr');
 
+      if (settled) return;
       const ok = exitCode === 0;
       const text = sanitizeFinalAnswer(lastAgentMessage);
       emitProgress({ stage: ok ? 'completed' : 'failed', threadId, messageCount, reasoningCount });
 
-      resolve({
+      finalize({
         ok,
         error: ok ? '' : quotaExhausted ? 'quota_exhausted' : `exit=${exitCode}${signal ? ` signal=${signal}` : ''}`,
         text,
@@ -291,6 +326,101 @@ function buildWindowsCommandCandidates(basePath) {
 
 function stripWrappingQuotes(value) {
   return String(value || '').trim().replace(/^"(.*)"$/, '$1');
+}
+
+function buildCodexEnv(baseEnv, spawnCommand) {
+  const env = { ...baseEnv };
+  const pathKey = Object.keys(env).find((key) => key.toLowerCase() === 'path') || 'PATH';
+  const currentPath = String(env[pathKey] || '');
+  const extraEntries = resolveCodexPathEntries(spawnCommand);
+  if (extraEntries.length === 0) {
+    return env;
+  }
+
+  const deduped = dedupePathEntries([...extraEntries, ...currentPath.split(path.delimiter)]);
+  env[pathKey] = deduped.join(path.delimiter);
+  return env;
+}
+
+function resolveCodexPathEntries(spawnCommand) {
+  if (process.platform !== 'win32') return [];
+
+  const entries = [];
+  const commandPath = stripWrappingQuotes(spawnCommand?.command || '');
+  const scriptPath = Array.isArray(spawnCommand?.args) ? stripWrappingQuotes(spawnCommand.args[0] || '') : '';
+
+  if (commandPath) {
+    const bundledRgDirFromNode = path.join(
+      path.dirname(commandPath),
+      'node_modules',
+      '@openai',
+      'codex',
+      'node_modules',
+      '@openai',
+      'codex-win32-x64',
+      'vendor',
+      'x86_64-pc-windows-msvc',
+      'codex-path',
+    );
+    if (fs.existsSync(path.join(bundledRgDirFromNode, 'rg.exe'))) {
+      entries.push(bundledRgDirFromNode);
+    }
+  }
+
+  if (scriptPath) {
+    const bundledRgDirFromScript = path.resolve(
+      path.dirname(scriptPath),
+      '..',
+      'node_modules',
+      '@openai',
+      'codex-win32-x64',
+      'vendor',
+      'x86_64-pc-windows-msvc',
+      'codex-path',
+    );
+    if (fs.existsSync(path.join(bundledRgDirFromScript, 'rg.exe'))) {
+      entries.push(bundledRgDirFromScript);
+    }
+  }
+
+  return dedupePathEntries(entries);
+}
+
+function dedupePathEntries(entries) {
+  const seen = new Set();
+  const output = [];
+
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const value = String(entry || '').trim();
+    if (!value) continue;
+    const key = process.platform === 'win32' ? value.toLowerCase() : value;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    output.push(value);
+  }
+
+  return output;
+}
+
+function terminateSpawnedProcess(child) {
+  if (!child || typeof child !== 'object') return;
+  if (child.exitCode != null) return;
+
+  if (process.platform === 'win32') {
+    const pid = Number(child.pid);
+    if (!Number.isFinite(pid) || pid <= 0) return;
+    const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    killer.on('error', () => {});
+    return;
+  }
+
+  try {
+    child.kill('SIGTERM');
+  } catch {
+  }
 }
 
 function sanitizeFinalAnswer(text) {
