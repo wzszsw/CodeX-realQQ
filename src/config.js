@@ -33,6 +33,7 @@ export function loadConfig() {
     aiProgressIntervalMs: parsePositiveInt(process.env.AI_PROGRESS_INTERVAL_MS, 15000),
     aiProgressSilenceMs: parsePositiveInt(process.env.AI_PROGRESS_SILENCE_MS, 10000),
     showReasoning: String(process.env.SHOW_REASONING || 'false').toLowerCase() === 'true',
+    billingEnabled: String(process.env.BILLING_ENABLED || 'true').toLowerCase() !== 'false',
     billing: {
       provider: String(process.env.BILLING_PROVIDER || 'n1n').trim().toLowerCase() || 'n1n',
       n1n: {

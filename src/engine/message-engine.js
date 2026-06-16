@@ -39,16 +39,19 @@ export class MessageEngine {
       return;
     }
 
+    if (!this.config.billingEnabled) {
+      if (commandText === '/help') {
+        await this.sendAssistantReply(message.conversationId, buildHelpReply(this.config));
+        return;
+      }
+      if (isBillingCommand(commandText)) {
+        await this.sendAssistantReply(message.conversationId, buildBillingDisabledReply());
+        return;
+      }
+    }
+
     if (commandText === '/help') {
-      await this.sendAssistantReply(message.conversationId, [
-        '可用命令',
-        '/help',
-        '/status',
-        '/reset',
-        '/充值',
-        '/余额',
-        '直接发送普通问题即可交给 Codex 处理。',
-      ].join('\n'));
+      await this.sendAssistantReply(message.conversationId, buildHelpReply(this.config));
       return;
     }
 
@@ -109,8 +112,10 @@ export class MessageEngine {
     if (!result.ok) {
       process.stdout.write(`provider result: conversation=${message.conversationId} provider=${result.provider || this.config.provider} fallbackFrom=${result.fallbackFrom || '-'} ok=${result.ok} elapsedMs=${Date.now() - providerStartedAt} error=${JSON.stringify(String(result.error || ''))}\n`);
       if (sawQuotaExhausted || looksLikeQuotaExhausted(result.error)) {
-        await this.sendAssistantReply(message.conversationId, buildQuotaExhaustedReply());
-        await this.handleRechargeCommand(message.conversationId);
+        await this.sendAssistantReply(message.conversationId, buildQuotaExhaustedReply(this.config));
+        if (this.config.billingEnabled) {
+          await this.handleRechargeCommand(message.conversationId);
+        }
         return;
       }
       await this.sendAssistantReply(message.conversationId, buildProviderFailureReply());
@@ -155,6 +160,10 @@ export class MessageEngine {
   }
 
   async handleRechargeCommand(conversationId) {
+    if (!this.config.billingEnabled) {
+      await this.sendAssistantReply(conversationId, buildBillingDisabledReply());
+      return;
+    }
     process.stdout.write(`recharge start: conversation=${conversationId}\n`);
     const recharge = await createRecharge(this.config);
     if (!recharge.ok) {
@@ -184,6 +193,10 @@ export class MessageEngine {
   }
 
   async handleBalanceCommand(conversationId) {
+    if (!this.config.billingEnabled) {
+      await this.sendAssistantReply(conversationId, buildBillingDisabledReply());
+      return;
+    }
     process.stdout.write(`balance start: conversation=${conversationId}\n`);
     const balance = await getBalance(this.config);
     if (!balance.ok) {
@@ -445,6 +458,31 @@ function buildIdentityReply(knowledgeLabel) {
   ].join('\n');
 }
 
+function isBillingCommand(commandText) {
+  return commandText === '/充值' || commandText === '/余额';
+}
+
+function buildHelpReply(config) {
+  const lines = [
+    '可用命令',
+    '/help',
+    '/status',
+    '/reset',
+  ];
+
+  if (config?.billingEnabled) {
+    lines.push('/充值');
+    lines.push('/余额');
+  }
+
+  lines.push('直接发送普通问题即可，Codex 会处理。');
+  return lines.join('\n');
+}
+
+function buildBillingDisabledReply() {
+  return '充值 / 余额功能已关闭。';
+}
+
 function isSensitiveMetaQuestion(text) {
   const value = String(text || '').trim().toLowerCase();
   if (!value) return false;
@@ -531,7 +569,10 @@ function buildProviderFailureReply() {
   return '刚刚处理出错了，请稍后再试一次。';
 }
 
-function buildQuotaExhaustedReply() {
+function buildQuotaExhaustedReply(config) {
+  if (config?.billingEnabled === false) {
+    return '当前额度不足，请联系管理员处理。';
+  }
   return '当前余额不足，需要先充值。';
 }
 
