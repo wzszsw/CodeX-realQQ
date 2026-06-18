@@ -89,7 +89,7 @@ function splitByStructuredBlocks(text, limits) {
 
   const flushCurrent = () => {
     if (!current) return;
-    const content = current.lines.join('\n').trim();
+    const content = normalizeStructuredContent(current.type, current.lines);
     if (content) {
       blocks.push({ type: current.type, content });
     }
@@ -159,12 +159,21 @@ function mergeStructuredBlocks(blocks, limits) {
 
 function normalizeStructuredBlock(block) {
   const type = String(block?.type || '').trim().toLowerCase();
-  const content = String(block?.content || '').trim();
+  const content = type === 'code'
+    ? trimCodeBlock(String(block?.content || ''))
+    : String(block?.content || '').trim();
   if (!content) return null;
   if (!['body', 'code', 'list', 'followup'].includes(type)) {
     return { type: 'body', content };
   }
   return { type, content };
+}
+
+function normalizeStructuredContent(type, lines) {
+  const content = Array.isArray(lines) ? lines.join('\n') : String(lines || '');
+  return String(type || '').trim().toLowerCase() === 'code'
+    ? trimCodeBlock(content)
+    : String(content || '').trim();
 }
 
 function shouldMergeStructuredBlocks(previous, current, limits) {
@@ -198,7 +207,9 @@ function splitByAiMarker(text, limits) {
 
 function renderStructuredBlock(block, limits) {
   const type = String(block?.type || 'body').trim().toLowerCase();
-  const content = String(block?.content || '').trim();
+  const content = type === 'code'
+    ? trimCodeBlock(String(block?.content || ''))
+    : String(block?.content || '').trim();
   if (!content) return [];
 
   if (type === 'code') {
@@ -315,7 +326,7 @@ function hardSplitSegment(text, limit) {
 }
 
 function splitCodeBlock(text, limits) {
-  const value = String(text || '').trim();
+  const value = trimCodeBlock(String(text || ''));
   if (!value) return [];
   if (value.length <= limits.codeSoftLimit) return [value];
 
@@ -336,12 +347,12 @@ function splitCodeBlock(text, limits) {
       continue;
     }
 
-    chunks.push(current.trim());
+    chunks.push(trimCodeBlock(current));
     current = line;
   }
 
-  if (current) chunks.push(current.trim());
-  return chunks.flatMap((item) => item.length > limits.codeSoftLimit ? hardSplitSegment(item, limits.codeSoftLimit) : [item]);
+  if (current) chunks.push(trimCodeBlock(current));
+  return chunks.flatMap((item) => item.length > limits.codeSoftLimit ? hardSplitCodeSegment(item, limits.codeSoftLimit) : [item]);
 }
 
 function buildListSegments(text, limit) {
@@ -525,4 +536,24 @@ function isCodeLikeLine(line) {
 
 function escapeRegex(value) {
   return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function trimCodeBlock(text) {
+  const value = String(text || '').replace(/\r\n/g, '\n');
+  return value.replace(/^\n+|\n+$/g, '');
+}
+
+function hardSplitCodeSegment(text, limit) {
+  const output = [];
+  let rest = trimCodeBlock(text);
+
+  while (rest.length > limit) {
+    let splitAt = rest.lastIndexOf('\n', limit);
+    if (splitAt < Math.floor(limit * 0.5)) splitAt = limit;
+    output.push(trimCodeBlock(rest.slice(0, splitAt)));
+    rest = trimCodeBlock(rest.slice(splitAt === limit ? splitAt : splitAt + 1));
+  }
+
+  if (rest) output.push(rest);
+  return output;
 }
