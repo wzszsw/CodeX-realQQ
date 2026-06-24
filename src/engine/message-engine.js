@@ -4,6 +4,17 @@ import { splitReplyText, stripReplyControlMarkers } from '../model.js';
 import { runProvider } from '../provider/index.js';
 import { createRecharge, getBalance } from '../billing/index.js';
 
+const AVATAR_SWITCH_COMMANDS = {
+  '/你是弱智': {
+    fileName: 'easy-query-bot-avatar-robot3-green-1024.png',
+    label: '绿色',
+  },
+  '/你很聪明': {
+    fileName: 'easy-query-bot-avatar-robot3-1024.png',
+    label: '红色',
+  },
+};
+
 export class MessageEngine {
   constructor(config, transport, sessionStore) {
     this.config = config;
@@ -18,6 +29,12 @@ export class MessageEngine {
     const attachments = Array.isArray(message.attachments) ? message.attachments : [];
     if (!text && attachments.length === 0) return;
     process.stdout.write(`engine inbound: conversation=${message.conversationId} text=${JSON.stringify(text.slice(0, 80))} attachments=${attachments.length}\n`);
+
+    const avatarSwitch = resolveAvatarSwitchCommand(commandText);
+    if (avatarSwitch) {
+      await this.handleAvatarSwitchCommand(message.conversationId, avatarSwitch);
+      return;
+    }
 
     if (isIdentityQuestion(originalText)) {
       await this.sendAssistantReply(message.conversationId, buildIdentityReply(this.config.knowledgeLabel));
@@ -211,6 +228,32 @@ export class MessageEngine {
     await this.sendAssistantReply(conversationId, `当前余额：${balance.balance.toFixed(2)} 元`);
   }
 
+  async handleAvatarSwitchCommand(conversationId, avatarSwitch) {
+    if (typeof this.transport?.callApi !== 'function') {
+      await this.sendAssistantReply(conversationId, '当前运行模式不支持修改 QQ 头像。');
+      return;
+    }
+
+    const filePath = path.join(this.config.rootDir, 'assets', 'final', avatarSwitch.fileName);
+    if (!fs.existsSync(filePath)) {
+      await this.sendAssistantReply(conversationId, `头像文件不存在：${avatarSwitch.fileName}`);
+      return;
+    }
+
+    try {
+      process.stdout.write(`avatar switch start: conversation=${conversationId} file=${avatarSwitch.fileName}\n`);
+      await this.transport.callApi('set_qq_avatar', { file: filePath });
+      process.stdout.write(`avatar switch success: conversation=${conversationId} file=${avatarSwitch.fileName}\n`);
+      await this.sendAssistantReply(conversationId, `头像已切换为${avatarSwitch.label}版本。`);
+    } catch (err) {
+      process.stderr.write(`avatar switch failed: conversation=${conversationId} file=${avatarSwitch.fileName} error=${err instanceof Error ? err.message : String(err)}\n`);
+      await this.sendAssistantReply(
+        conversationId,
+        `头像切换失败：${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
   async reply(conversationId, text) {
     const chunks = splitReplyText(text, this.config.maxReplyChars, {
       codeBlockMaxChars: this.config.replyCodeBlockMaxChars,
@@ -293,6 +336,10 @@ function extractCurrentCommandText(message, fallbackText) {
   }
 
   return raw.startsWith('/') ? raw : '';
+}
+
+function resolveAvatarSwitchCommand(commandText) {
+  return AVATAR_SWITCH_COMMANDS[String(commandText || '').trim()] || null;
 }
 
 function toOneBotFileRef(filePath) {
