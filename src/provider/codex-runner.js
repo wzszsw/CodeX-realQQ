@@ -257,6 +257,9 @@ function resolveCodexCommand(codexBin, args) {
   const pathResolution = resolvedCommandPath ? resolveCodexNodeWrapper(resolvedCommandPath, args) : null;
   if (pathResolution) return pathResolution;
 
+  const executableResolution = resolvedCommandPath ? resolveWindowsExecutableCommand(resolvedCommandPath, args) : null;
+  if (executableResolution) return executableResolution;
+
   return { command, args };
 }
 
@@ -265,21 +268,52 @@ function resolveCodexNodeWrapper(command, args) {
   if (!raw) return null;
 
   const lower = raw.replace(/\\/g, '/').toLowerCase();
+  if (lower.endsWith('/codex.js') || lower.endsWith('codex.js')) {
+    if (fs.existsSync(raw) && fs.existsSync(process.execPath)) {
+      return { command: process.execPath, args: [raw, ...args] };
+    }
+    return null;
+  }
+
   if (lower.endsWith('/node.exe') || lower.endsWith('node.exe')) {
-    const codexScript = path.join(path.dirname(raw), 'node_modules', '@openai', 'codex', 'bin', 'codex.js');
+    const codexScript = resolveCodexScriptPath(raw);
     if (fs.existsSync(codexScript)) {
       return { command: raw, args: [codexScript, ...args] };
     }
     return null;
   }
 
+  const codexScript = resolveCodexScriptPath(raw);
+  if (!codexScript) {
+    return null;
+  }
+
   const siblingNode = path.join(path.dirname(raw), 'node.exe');
-  const codexScript = path.join(path.dirname(raw), 'node_modules', '@openai', 'codex', 'bin', 'codex.js');
-  if (fs.existsSync(siblingNode) && fs.existsSync(codexScript)) {
+  if (fs.existsSync(siblingNode)) {
     return { command: siblingNode, args: [codexScript, ...args] };
   }
 
+  if (fs.existsSync(process.execPath)) {
+    return { command: process.execPath, args: [codexScript, ...args] };
+  }
+
   return null;
+}
+
+function resolveCodexScriptPath(command) {
+  const raw = stripWrappingQuotes(command);
+  if (!raw) return '';
+
+  const lower = raw.replace(/\\/g, '/').toLowerCase();
+  if (lower.endsWith('/codex.js') || lower.endsWith('codex.js')) {
+    return fs.existsSync(raw) ? raw : '';
+  }
+
+  const baseDir = lower.endsWith('/node.exe') || lower.endsWith('node.exe')
+    ? path.dirname(raw)
+    : path.dirname(raw);
+  const codexScript = path.join(baseDir, 'node_modules', '@openai', 'codex', 'bin', 'codex.js');
+  return fs.existsSync(codexScript) ? codexScript : '';
 }
 
 function resolveWindowsCommandPath(command) {
@@ -289,10 +323,13 @@ function resolveWindowsCommandPath(command) {
   const hasPathSeparator = raw.includes('/') || raw.includes('\\');
   const pathEntries = hasPathSeparator || path.isAbsolute(raw)
     ? ['']
-    : String(process.env.PATH || '')
-      .split(path.delimiter)
-      .map((entry) => stripWrappingQuotes(entry))
-      .filter(Boolean);
+    : dedupePathEntries([
+        ...String(process.env.PATH || '')
+          .split(path.delimiter)
+          .map((entry) => stripWrappingQuotes(entry))
+          .filter(Boolean),
+        ...buildWindowsGlobalCommandDirs(),
+      ]);
 
   for (const entry of pathEntries) {
     const basePath = entry ? path.join(entry, raw) : raw;
@@ -304,6 +341,35 @@ function resolveWindowsCommandPath(command) {
   }
 
   return '';
+}
+
+function buildWindowsGlobalCommandDirs() {
+  if (process.platform !== 'win32') return [];
+
+  const dirs = [];
+  const appData = stripWrappingQuotes(process.env.APPDATA || '');
+  if (appData) {
+    dirs.push(path.join(appData, 'npm'));
+  }
+
+  const userProfile = stripWrappingQuotes(process.env.USERPROFILE || '');
+  if (userProfile) {
+    dirs.push(path.join(userProfile, 'AppData', 'Roaming', 'npm'));
+  }
+
+  return dedupePathEntries(dirs);
+}
+
+function resolveWindowsExecutableCommand(command, args) {
+  const raw = stripWrappingQuotes(command);
+  if (!raw) return null;
+
+  const ext = path.extname(raw).toLowerCase();
+  if (ext === '.exe' || ext === '.com') {
+    return { command: raw, args };
+  }
+
+  return null;
 }
 
 function buildWindowsCommandCandidates(basePath) {
