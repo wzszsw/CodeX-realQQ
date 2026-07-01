@@ -729,6 +729,18 @@ function looksLikeKnowledgeQuestion(text) {
     '方法',
     '类',
     '注解',
+    'dto',
+    'vo',
+    'navigate',
+    'savable',
+    'easyentityquery',
+    'relationtypeenum',
+    'manytomany',
+    'onetomany',
+    'targetproperty',
+    'targetmappingproperty',
+    'mappingclass',
+    '聚合根',
     '配置',
     'dsl',
     'sql',
@@ -789,6 +801,18 @@ function looksLikeKnowledgeAnswer(text) {
     '类',
     '接口',
     '注解',
+    'dto',
+    'vo',
+    'navigate',
+    'savable',
+    'easyentityquery',
+    'relationtypeenum',
+    'manytomany',
+    'onetomany',
+    'targetproperty',
+    'targetmappingproperty',
+    'mappingclass',
+    '聚合根',
     '查询',
     '更新',
     '删除',
@@ -863,6 +887,15 @@ function looksLikeStructuredTechnicalPayload(text) {
     'package ',
     '@table',
     '@column',
+    '@navigate',
+    '@easycond',
+    '@apimodelproperty',
+    'easyentityquery',
+    'savable(',
+    'relationtypeenum',
+    'targetproperty',
+    'targetmappingproperty',
+    'mappingclass',
     '@data',
     'exception',
     'stack trace',
@@ -905,13 +938,18 @@ function hasPromotionSignals(text) {
     '代写',
     '接单',
     '出售',
-    '课程',
-    '培训',
     '免费领取',
     '点击链接',
     '扫码',
   ];
-  return hints.some((item) => text.includes(item));
+  if (hints.some((item) => text.includes(item))) return true;
+
+  const weakBusinessWords = [
+    '课程',
+    '培训',
+  ];
+  return weakBusinessWords.some((item) => text.includes(item))
+    && (hasContactCollectionSignals(text) || /(免费领取|优惠|报名|扫码|点击链接|加我|私聊|客服|引流|返利)/.test(text));
 }
 
 function hasContactCollectionSignals(text) {
